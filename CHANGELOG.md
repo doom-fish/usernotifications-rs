@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.1] - 2026-05-17
+
+- Added macOS 15 content-provider coverage with the sealed `NotificationContentProviding` trait, `NotificationContent::updating_from`, and the Intents-backed `NotificationAttributedMessageContext` helper.
+- Added content-provider smoke coverage to the content integration test and example, and updated the checked-in coverage docs to reflect full audit coverage.
+
 ## [0.2.0] - 2026-05-16
 
 - Split the crate into per-area Rust modules and per-area Swift bridge files following the screencapturekit-style layout.

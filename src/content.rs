@@ -8,6 +8,10 @@ use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
 use crate::private::{decode_json, to_cstring};
 
+mod content_provider_private {
+    pub trait Sealed {}
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LocalizedNotificationString {
     pub key: String,
@@ -59,6 +63,190 @@ pub enum NotificationSound {
     Named(String),
     CriticalNamed { name: String, volume: Option<f32> },
     Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(i32)]
+pub enum NotificationMessagePersonHandleType {
+    Unknown = 0,
+    EmailAddress = 1,
+    PhoneNumber = 2,
+}
+
+impl NotificationMessagePersonHandleType {
+    #[must_use]
+    pub const fn from_raw(raw: i32) -> Self {
+        match raw {
+            1 => Self::EmailAddress,
+            2 => Self::PhoneNumber,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(i32)]
+pub enum NotificationMessageType {
+    Unknown = 0,
+    Text = 1,
+    Audio = 2,
+}
+
+impl NotificationMessageType {
+    #[must_use]
+    pub const fn from_raw(raw: i32) -> Self {
+        match raw {
+            1 => Self::Text,
+            2 => Self::Audio,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotificationMessagePerson {
+    pub handle: String,
+    pub handle_type: NotificationMessagePersonHandleType,
+    pub display_name: Option<String>,
+    pub contact_identifier: Option<String>,
+    pub custom_identifier: Option<String>,
+    pub is_me: bool,
+}
+
+impl NotificationMessagePerson {
+    #[must_use]
+    pub fn new(
+        handle: impl Into<String>,
+        handle_type: NotificationMessagePersonHandleType,
+    ) -> Self {
+        Self {
+            handle: handle.into(),
+            handle_type,
+            display_name: None,
+            contact_identifier: None,
+            custom_identifier: None,
+            is_me: false,
+        }
+    }
+
+    #[must_use]
+    pub fn with_display_name(mut self, display_name: impl Into<String>) -> Self {
+        self.display_name = Some(display_name.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_contact_identifier(mut self, contact_identifier: impl Into<String>) -> Self {
+        self.contact_identifier = Some(contact_identifier.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_custom_identifier(mut self, custom_identifier: impl Into<String>) -> Self {
+        self.custom_identifier = Some(custom_identifier.into());
+        self
+    }
+
+    #[must_use]
+    pub const fn with_is_me(mut self, is_me: bool) -> Self {
+        self.is_me = is_me;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotificationAttributedMessageContext {
+    pub sender: Option<NotificationMessagePerson>,
+    pub recipients: Vec<NotificationMessagePerson>,
+    pub attributed_content: String,
+    pub content: Option<String>,
+    pub outgoing_message_type: NotificationMessageType,
+    pub conversation_identifier: Option<String>,
+    pub service_name: Option<String>,
+    pub group_name: Option<String>,
+}
+
+impl NotificationAttributedMessageContext {
+    #[must_use]
+    pub fn new(attributed_content: impl Into<String>) -> Self {
+        Self {
+            sender: None,
+            recipients: Vec::new(),
+            attributed_content: attributed_content.into(),
+            content: None,
+            outgoing_message_type: NotificationMessageType::Text,
+            conversation_identifier: None,
+            service_name: None,
+            group_name: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_sender(mut self, sender: NotificationMessagePerson) -> Self {
+        self.sender = Some(sender);
+        self
+    }
+
+    #[must_use]
+    pub fn with_recipient(mut self, recipient: NotificationMessagePerson) -> Self {
+        self.recipients.push(recipient);
+        self
+    }
+
+    #[must_use]
+    pub fn with_recipients(mut self, recipients: Vec<NotificationMessagePerson>) -> Self {
+        self.recipients = recipients;
+        self
+    }
+
+    #[must_use]
+    pub fn with_content(mut self, content: impl Into<String>) -> Self {
+        self.content = Some(content.into());
+        self
+    }
+
+    #[must_use]
+    pub const fn with_outgoing_message_type(
+        mut self,
+        outgoing_message_type: NotificationMessageType,
+    ) -> Self {
+        self.outgoing_message_type = outgoing_message_type;
+        self
+    }
+
+    #[must_use]
+    pub fn with_conversation_identifier(
+        mut self,
+        conversation_identifier: impl Into<String>,
+    ) -> Self {
+        self.conversation_identifier = Some(conversation_identifier.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_service_name(mut self, service_name: impl Into<String>) -> Self {
+        self.service_name = Some(service_name.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_group_name(mut self, group_name: impl Into<String>) -> Self {
+        self.group_name = Some(group_name.into());
+        self
+    }
+}
+
+pub trait NotificationContentProviding: content_provider_private::Sealed {
+    #[doc(hidden)]
+    fn encode_provider_json(&self) -> Result<String, UserNotificationsError>;
+}
+
+impl content_provider_private::Sealed for NotificationAttributedMessageContext {}
+
+impl NotificationContentProviding for NotificationAttributedMessageContext {
+    fn encode_provider_json(&self) -> Result<String, UserNotificationsError> {
+        encode_content_provider_json(&NotificationContentProviderPayload::from(self))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -176,10 +364,7 @@ impl NotificationContent {
     }
 
     #[must_use]
-    pub fn with_localized_title(
-        mut self,
-        localized_title: LocalizedNotificationString,
-    ) -> Self {
+    pub fn with_localized_title(mut self, localized_title: LocalizedNotificationString) -> Self {
         self.localized_title = Some(localized_title);
         self
     }
@@ -194,10 +379,7 @@ impl NotificationContent {
     }
 
     #[must_use]
-    pub fn with_localized_body(
-        mut self,
-        localized_body: LocalizedNotificationString,
-    ) -> Self {
+    pub fn with_localized_body(mut self, localized_body: LocalizedNotificationString) -> Self {
         self.localized_body = Some(localized_body);
         self
     }
@@ -215,7 +397,31 @@ impl NotificationContent {
         let content = encode_content_json(self)?;
         let content = to_cstring(&content)?;
         let mut error = core::ptr::null_mut();
-        let payload = unsafe { ffi::content::un_content_roundtrip_json(content.as_ptr(), &mut error) };
+        let payload =
+            unsafe { ffi::content::un_content_roundtrip_json(content.as_ptr(), &mut error) };
+        if payload.is_null() {
+            Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
+        } else {
+            decode_content_json(payload)
+        }
+    }
+
+    pub fn updating_from<P: NotificationContentProviding>(
+        &self,
+        provider: &P,
+    ) -> Result<Self, UserNotificationsError> {
+        let content = encode_content_json(self)?;
+        let provider = provider.encode_provider_json()?;
+        let content = to_cstring(&content)?;
+        let provider = to_cstring(&provider)?;
+        let mut error = core::ptr::null_mut();
+        let payload = unsafe {
+            ffi::content::un_content_updating_with_provider_json(
+                content.as_ptr(),
+                provider.as_ptr(),
+                &mut error,
+            )
+        };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
@@ -273,14 +479,16 @@ impl From<NotificationSoundPayload> for NotificationSound {
         match value.kind.as_str() {
             "default" => Self::Default,
             "defaultCritical" => Self::DefaultCritical,
-            "defaultCriticalWithVolume" => {
-                value.volume.map_or(Self::Unknown, Self::DefaultCriticalWithVolume)
-            }
+            "defaultCriticalWithVolume" => value
+                .volume
+                .map_or(Self::Unknown, Self::DefaultCriticalWithVolume),
             "named" => value.name.map_or(Self::Unknown, Self::Named),
-            "criticalNamed" => value.name.map_or(Self::Unknown, |name| Self::CriticalNamed {
-                name,
-                volume: value.volume,
-            }),
+            "criticalNamed" => value
+                .name
+                .map_or(Self::Unknown, |name| Self::CriticalNamed {
+                    name,
+                    volume: value.volume,
+                }),
             _ => Self::Unknown,
         }
     }
@@ -362,6 +570,90 @@ impl From<NotificationContentPayload> for NotificationContent {
             localized_summary_argument: value.localized_summary_argument,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct NotificationMessagePersonPayload {
+    handle: String,
+    handle_type: i32,
+    display_name: Option<String>,
+    contact_identifier: Option<String>,
+    custom_identifier: Option<String>,
+    is_me: bool,
+}
+
+impl From<&NotificationMessagePerson> for NotificationMessagePersonPayload {
+    fn from(value: &NotificationMessagePerson) -> Self {
+        Self {
+            handle: value.handle.clone(),
+            handle_type: value.handle_type as i32,
+            display_name: value.display_name.clone(),
+            contact_identifier: value.contact_identifier.clone(),
+            custom_identifier: value.custom_identifier.clone(),
+            is_me: value.is_me,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct NotificationAttributedMessageContextPayload {
+    sender: Option<NotificationMessagePersonPayload>,
+    recipients: Vec<NotificationMessagePersonPayload>,
+    attributed_content: String,
+    content: Option<String>,
+    outgoing_message_type: i32,
+    conversation_identifier: Option<String>,
+    service_name: Option<String>,
+    group_name: Option<String>,
+}
+
+impl From<&NotificationAttributedMessageContext> for NotificationAttributedMessageContextPayload {
+    fn from(value: &NotificationAttributedMessageContext) -> Self {
+        Self {
+            sender: value
+                .sender
+                .as_ref()
+                .map(NotificationMessagePersonPayload::from),
+            recipients: value
+                .recipients
+                .iter()
+                .map(NotificationMessagePersonPayload::from)
+                .collect(),
+            attributed_content: value.attributed_content.clone(),
+            content: value.content.clone(),
+            outgoing_message_type: value.outgoing_message_type as i32,
+            conversation_identifier: value.conversation_identifier.clone(),
+            service_name: value.service_name.clone(),
+            group_name: value.group_name.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct NotificationContentProviderPayload {
+    kind: String,
+    attributed_message_context: Option<NotificationAttributedMessageContextPayload>,
+}
+
+impl From<&NotificationAttributedMessageContext> for NotificationContentProviderPayload {
+    fn from(value: &NotificationAttributedMessageContext) -> Self {
+        Self {
+            kind: "attributedMessageContext".into(),
+            attributed_message_context: Some(NotificationAttributedMessageContextPayload::from(
+                value,
+            )),
+        }
+    }
+}
+
+fn encode_content_provider_json(
+    provider: &NotificationContentProviderPayload,
+) -> Result<String, UserNotificationsError> {
+    serde_json::to_string(provider).map_err(|error| {
+        UserNotificationsError::FrameworkError(format!(
+            "failed to encode notification content provider: {error}",
+        ))
+    })
 }
 
 pub(crate) fn encode_content_json(

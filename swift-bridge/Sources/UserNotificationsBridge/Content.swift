@@ -1,4 +1,5 @@
 import Foundation
+import Intents
 import UserNotifications
 
 struct UNNotificationSoundPayload: Codable {
@@ -26,6 +27,112 @@ struct UNNotificationContentPayload: Codable {
     var localized_subtitle: UNLocalizedStringPayload?
     var localized_body: UNLocalizedStringPayload?
     var localized_summary_argument: UNLocalizedStringPayload?
+}
+
+struct UNNotificationMessagePersonPayload: Codable {
+    var handle: String
+    var handle_type: Int32
+    var display_name: String?
+    var contact_identifier: String?
+    var custom_identifier: String?
+    var is_me: Bool
+}
+
+struct UNNotificationAttributedMessageContextPayload: Codable {
+    var sender: UNNotificationMessagePersonPayload?
+    var recipients: [UNNotificationMessagePersonPayload]
+    var attributed_content: String
+    var content: String?
+    var outgoing_message_type: Int32
+    var conversation_identifier: String?
+    var service_name: String?
+    var group_name: String?
+}
+
+struct UNNotificationContentProviderPayload: Codable {
+    var kind: String
+    var attributed_message_context: UNNotificationAttributedMessageContextPayload?
+}
+
+private func un_non_empty_string(_ value: String?) -> String? {
+    guard let value, !value.isEmpty else {
+        return nil
+    }
+    return value
+}
+
+@available(macOS 15.0, *)
+private func un_make_message_person(_ payload: UNNotificationMessagePersonPayload) -> INPerson {
+    let handleType = INPersonHandleType(rawValue: Int(payload.handle_type)) ?? .unknown
+    let handle = INPersonHandle(value: un_non_empty_string(payload.handle), type: handleType)
+    return INPerson(
+        personHandle: handle,
+        nameComponents: nil,
+        displayName: un_non_empty_string(payload.display_name),
+        image: nil,
+        contactIdentifier: un_non_empty_string(payload.contact_identifier),
+        customIdentifier: un_non_empty_string(payload.custom_identifier),
+        isMe: payload.is_me,
+        suggestionType: .none
+    )
+}
+
+@available(macOS 15.0, *)
+private func un_make_speakable_string(_ value: String?) -> INSpeakableString? {
+    guard let value = un_non_empty_string(value) else {
+        return nil
+    }
+    return INSpeakableString(
+        vocabularyIdentifier: value,
+        spokenPhrase: value,
+        pronunciationHint: nil
+    )
+}
+
+@available(macOS 15.0, *)
+private func un_make_outgoing_message_type(_ raw: Int32) -> INOutgoingMessageType {
+    INOutgoingMessageType(rawValue: Int(raw)) ?? .outgoingMessageText
+}
+
+@available(macOS 15.0, *)
+private func un_make_attributed_message_context(
+    _ payload: UNNotificationAttributedMessageContextPayload
+) -> UNNotificationAttributedMessageContext {
+    let recipients = payload.recipients.map(un_make_message_person)
+    let intent = INSendMessageIntent(
+        recipients: recipients.isEmpty ? nil : recipients,
+        outgoingMessageType: un_make_outgoing_message_type(payload.outgoing_message_type),
+        content: un_non_empty_string(payload.content) ?? un_non_empty_string(payload.attributed_content),
+        speakableGroupName: un_make_speakable_string(payload.group_name),
+        conversationIdentifier: un_non_empty_string(payload.conversation_identifier),
+        serviceName: un_non_empty_string(payload.service_name),
+        sender: payload.sender.map(un_make_message_person),
+        attachments: nil
+    )
+    return UNNotificationAttributedMessageContext(
+        sendMessageIntent: intent,
+        attributedContent: NSAttributedString(string: payload.attributed_content)
+    )
+}
+
+@available(macOS 15.0, *)
+private func un_updated_content(
+    _ content: UNNotificationContent,
+    providerPayload: UNNotificationContentProviderPayload
+) throws -> UNNotificationContent {
+    switch providerPayload.kind {
+    case "attributedMessageContext":
+        guard let payload = providerPayload.attributed_message_context else {
+            throw NSError(domain: "usernotifications-rs", code: Int(UNR_INVALID_ARGUMENT), userInfo: [
+                NSLocalizedDescriptionKey: "attributedMessageContext payload is required",
+            ])
+        }
+        return try content.updating(from: un_make_attributed_message_context(payload))
+    default:
+        throw NSError(domain: "usernotifications-rs", code: Int(UNR_INVALID_ARGUMENT), userInfo: [
+            NSLocalizedDescriptionKey: "unsupported notification content provider kind: \(providerPayload.kind)",
+        ])
+    }
 }
 
 private func un_make_sound(_ payload: UNNotificationSoundPayload?) throws -> UNNotificationSound? {
@@ -199,6 +306,31 @@ public func un_content_roundtrip_json(
         let payload = try un_decode_json(contentJSON, as: UNNotificationContentPayload.self)
         let content = try un_make_content(payload)
         return un_string(un_encode_json(un_content_payload(content, source: payload)))
+    } catch {
+        un_write_error(errorOut, error: error)
+        return nil
+    }
+}
+
+@_cdecl("un_content_updating_with_provider_json")
+public func un_content_updating_with_provider_json(
+    _ contentJSON: UnsafePointer<CChar>?,
+    _ providerJSON: UnsafePointer<CChar>?,
+    _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> UnsafeMutablePointer<CChar>? {
+    do {
+        let payload = try un_decode_json(contentJSON, as: UNNotificationContentPayload.self)
+        let providerPayload = try un_decode_json(providerJSON, as: UNNotificationContentProviderPayload.self)
+        let content = try un_make_content(payload)
+        let updatedContent: UNNotificationContent
+        if #available(macOS 15.0, *) {
+            updatedContent = try un_updated_content(content, providerPayload: providerPayload)
+        } else {
+            throw NSError(domain: "usernotifications-rs", code: Int(UNR_FRAMEWORK_ERROR), userInfo: [
+                NSLocalizedDescriptionKey: "notification content providers require macOS 15 or newer",
+            ])
+        }
+        return un_string(un_encode_json(un_content_payload(updatedContent, source: payload)))
     } catch {
         un_write_error(errorOut, error: error)
         return nil

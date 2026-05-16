@@ -5,4 +5,9 @@ unsafe extern "C" {
         content_json: *const c_char,
         error_out: *mut *mut c_char,
     ) -> *mut c_char;
+    pub fn un_content_updating_with_provider_json(
+        content_json: *const c_char,
+        provider_json: *const c_char,
+        error_out: *mut *mut c_char,
+    ) -> *mut c_char;
 }

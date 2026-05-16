@@ -8,10 +8,9 @@ use std::process::Command;
 
 const BUNDLED_ENV: &str = "USERNOTIFICATIONS_BUNDLED";
 const PNG_BYTES: &[u8; 70] = &[
-    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0,
-    1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 8, 29, 99, 248, 255,
-    255, 63, 3, 0, 8, 252, 2, 254, 94, 115, 247, 39, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66,
-    96, 130,
+    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0,
+    0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 8, 29, 99, 248, 255, 255, 63, 3, 0, 8,
+    252, 2, 254, 94, 115, 247, 39, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
 ];
 
 pub fn relaunch_from_app_bundle_if_needed(
@@ -83,7 +82,7 @@ fn info_plist(executable_name: &str, bundle_identifier: &str) -> String {
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.2.0</string>
+    <string>0.2.1</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>

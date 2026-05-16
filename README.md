@@ -2,11 +2,12 @@
 
 Safe, idiomatic Rust bindings for Apple's [UserNotifications](https://developer.apple.com/documentation/usernotifications) and `UserNotificationsUI` frameworks on macOS.
 
-## 0.2.0 highlights
+## 0.2.1 highlights
 
 - 11 logical coverage areas with one Rust module and one Swift bridge file per area.
 - Expanded `UNUserNotificationCenter` coverage for settings, categories, delivered/pending notifications, delegate callbacks, `supportsContentExtensions`, and `setBadgeCount`.
 - Rich model coverage for requests, content, triggers, categories, actions, attachments, responses, and settings.
+- Added macOS 15 content-provider specialization via `NotificationContentProviding`, `NotificationContent::updating_from`, and `NotificationAttributedMessageContext`.
 - Rust-friendly simulator/context wrappers for `UNNotificationServiceExtension` and `UNNotificationContentExtension`.
 - 11 examples plus integration tests spanning every logical area.
 - A checked-in [COVERAGE.md](COVERAGE.md) matrix documenting implemented, simulated, and macOS-unavailable SDK surface.
@@ -15,14 +16,14 @@ Safe, idiomatic Rust bindings for Apple's [UserNotifications](https://developer.
 
 - macOS 10.14 or newer
 - Xcode 15+ with a recent macOS SDK
-- Some APIs are availability-gated by Apple (`UNNotificationContentExtension` on macOS 11+, action icons / interruption metadata on macOS 12+, badge count / filter criteria on macOS 13+)
+- Some APIs are availability-gated by Apple (`UNNotificationContentExtension` on macOS 11+, action icons / interruption metadata on macOS 12+, badge count / filter criteria on macOS 13+, content-provider specialization on macOS 15+)
 - For authorization and local-notification delivery in GUI apps, the app must run with the appropriate notification entitlements and user consent
 
 ## Installation
 
 ```toml
 [dependencies]
-usernotifications-rs = "0.2.0"
+usernotifications-rs = "0.2.1"
 ```
 
 ```rust,no_run
@@ -43,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 | --- | --- |
 | `01_smoke` | `UNUserNotificationCenter` smoke / bundle bootstrap |
 | `02_request_roundtrip` | `UNNotificationRequest` |
-| `03_content_roundtrip` | `UNNotificationContent` |
+| `03_content_roundtrip` | `UNNotificationContent` / content providers |
 | `04_trigger_roundtrip` | `UNNotificationTrigger` |
 | `05_category_roundtrip` | `UNNotificationCategory` |
 | `06_action_roundtrip` | `UNNotificationAction` / `UNNotificationActionIcon` |
@@ -65,6 +66,7 @@ cargo run --example 01_smoke
 - `LocalizedNotificationString` is the Rust representation of Apple's `localizedUserNotificationStringForKey:arguments:` localization flow.
 - Extension APIs are exposed as simulator/context wrappers rather than generated Xcode extension targets, which keeps the crate usable from ordinary Rust test and example binaries.
 - Notification `user_info` values are surfaced as `serde_json::Value` for lossless JSON-friendly transport across the Swift bridge.
+- `NotificationContentProviding` is intentionally sealed because Apple only accepts SDK-owned provider objects; `NotificationAttributedMessageContext` is the safe Rust helper for the macOS 15 message-style provider flow.
 - Platform-unavailable APIs such as `UNLocationNotificationTrigger` are documented explicitly in [COVERAGE.md](COVERAGE.md).
 
 ## License

@@ -25,13 +25,13 @@ pub mod content_extension;
 pub mod error;
 pub mod ffi;
 pub mod notification;
+mod option_set;
+mod private;
 pub mod request;
 pub mod response;
 pub mod service_extension;
 pub mod settings;
 pub mod trigger;
-mod option_set;
-mod private;
 
 pub use action::{NotificationAction, NotificationActionIcon, NotificationActionOptions};
 pub use attachment::{
@@ -45,18 +45,18 @@ pub use center::{
     UserNotificationCenter, UserNotificationCenterCallbacks, UserNotificationCenterDelegate,
 };
 pub use content::{
-    LocalizedNotificationString, NotificationContent, NotificationInterruptionLevel,
-    NotificationSound,
+    LocalizedNotificationString, NotificationAttributedMessageContext, NotificationContent,
+    NotificationContentProviding, NotificationInterruptionLevel, NotificationMessagePerson,
+    NotificationMessagePersonHandleType, NotificationMessageType, NotificationSound,
 };
 pub use content_extension::{
     NotificationContentExtensionCallbacks, NotificationContentExtensionContext,
     NotificationContentExtensionHandler, NotificationContentExtensionMediaPlayPauseButtonType,
-    NotificationContentExtensionResponseOption, NotificationContentExtensionRect,
+    NotificationContentExtensionRect, NotificationContentExtensionResponseOption,
     NotificationContentExtensionSimulator, NotificationContentExtensionTintColor,
 };
 pub use error::{
-    UserNotificationsError, UserNotificationsFrameworkErrorCode,
-    USER_NOTIFICATIONS_ERROR_DOMAIN,
+    UserNotificationsError, UserNotificationsFrameworkErrorCode, USER_NOTIFICATIONS_ERROR_DOMAIN,
 };
 pub use notification::Notification;
 pub use request::NotificationRequest;
@@ -76,7 +76,9 @@ pub use trigger::{CalendarTrigger, DateComponents, NotificationTrigger, TimeInte
 
 /// Common imports.
 pub mod prelude {
-    pub use crate::action::{NotificationAction, NotificationActionIcon, NotificationActionOptions};
+    pub use crate::action::{
+        NotificationAction, NotificationActionIcon, NotificationActionOptions,
+    };
     pub use crate::attachment::{
         AttachmentThumbnailClippingRect, AttachmentThumbnailTime, NotificationAttachment,
         NotificationAttachmentOptions,
@@ -86,14 +88,14 @@ pub mod prelude {
         UserNotificationCenter, UserNotificationCenterCallbacks, UserNotificationCenterDelegate,
     };
     pub use crate::content::{
-        LocalizedNotificationString, NotificationContent, NotificationInterruptionLevel,
-        NotificationSound,
+        LocalizedNotificationString, NotificationAttributedMessageContext, NotificationContent,
+        NotificationContentProviding, NotificationInterruptionLevel, NotificationMessagePerson,
+        NotificationMessagePersonHandleType, NotificationMessageType, NotificationSound,
     };
     pub use crate::content_extension::{
         NotificationContentExtensionCallbacks, NotificationContentExtensionContext,
-        NotificationContentExtensionHandler,
-        NotificationContentExtensionMediaPlayPauseButtonType,
-        NotificationContentExtensionResponseOption, NotificationContentExtensionRect,
+        NotificationContentExtensionHandler, NotificationContentExtensionMediaPlayPauseButtonType,
+        NotificationContentExtensionRect, NotificationContentExtensionResponseOption,
         NotificationContentExtensionSimulator, NotificationContentExtensionTintColor,
     };
     pub use crate::error::{

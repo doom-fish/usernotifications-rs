@@ -15,6 +15,7 @@ fn main() {
     println!("cargo:rustc-link-lib=framework=UserNotifications");
     println!("cargo:rustc-link-lib=framework=UserNotificationsUI");
     println!("cargo:rustc-link-lib=framework=Foundation");
+    println!("cargo:rustc-link-lib=framework=Intents");
     println!("cargo:rustc-link-lib=framework=AppKit");
     println!("cargo:rustc-link-lib=framework=CoreGraphics");
 
@@ -81,8 +82,9 @@ fn main() {
     match Command::new("xcode-select").arg("-p").output() {
         Ok(output) if output.status.success() => {
             let xcode_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            let swift_compat_path =
-                format!("{xcode_path}/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/macosx");
+            let swift_compat_path = format!(
+                "{xcode_path}/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/macosx"
+            );
             println!("cargo:rustc-link-search=native={swift_compat_path}");
             println!("cargo:rustc-link-arg=-Wl,-rpath,{swift_compat_path}");
 
