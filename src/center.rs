@@ -4,15 +4,16 @@ use std::sync::Mutex;
 
 use serde::Deserialize;
 
+use crate::category::{decode_categories_json, encode_categories_json, NotificationCategory};
 use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
-use crate::notification::{
-    decode_categories_json, decode_notifications_json, decode_requests_json, decode_settings_json,
-    encode_categories_json, encode_request_json, AuthorizationOptions, Notification,
-    NotificationCategory, NotificationPayload, NotificationRequest, NotificationResponse,
-    NotificationResponsePayload, NotificationSettings,
-};
+use crate::notification::{decode_notifications_json, Notification, NotificationPayload};
 use crate::private::to_cstring;
+use crate::request::{decode_requests_json, encode_request_json, NotificationRequest};
+use crate::response::{
+    NotificationPresentationOptions, NotificationResponse, NotificationResponsePayload,
+};
+use crate::settings::{decode_settings_json, AuthorizationOptions, NotificationSettings};
 
 #[derive(Deserialize)]
 struct CenterEventPayload {
@@ -26,6 +27,14 @@ mod private {
 }
 
 pub trait UserNotificationCenterDelegate: Send + private::Sealed {
+    fn will_present_notification(
+        &mut self,
+        notification: Notification,
+    ) -> NotificationPresentationOptions {
+        let _ = notification;
+        NotificationPresentationOptions::NONE
+    }
+
     fn did_receive_notification_response(&mut self, response: NotificationResponse) {
         let _ = response;
     }
@@ -35,11 +44,13 @@ pub trait UserNotificationCenterDelegate: Send + private::Sealed {
     }
 }
 
+type WillPresentHandler = Box<dyn FnMut(Notification) -> NotificationPresentationOptions + Send + 'static>;
 type ResponseHandler = Box<dyn FnMut(NotificationResponse) + Send + 'static>;
 type OpenSettingsHandler = Box<dyn FnMut(Option<Notification>) + Send + 'static>;
 
 #[allow(clippy::type_complexity)]
 pub struct UserNotificationCenterCallbacks {
+    will_present: Option<WillPresentHandler>,
     response: Option<ResponseHandler>,
     open_settings: Option<OpenSettingsHandler>,
 }
@@ -48,9 +59,19 @@ impl UserNotificationCenterCallbacks {
     #[must_use]
     pub fn new() -> Self {
         Self {
+            will_present: None,
             response: None,
             open_settings: None,
         }
+    }
+
+    #[must_use]
+    pub fn on_will_present(
+        mut self,
+        callback: impl FnMut(Notification) -> NotificationPresentationOptions + Send + 'static,
+    ) -> Self {
+        self.will_present = Some(Box::new(callback));
+        self
     }
 
     #[must_use]
@@ -80,6 +101,17 @@ impl Default for UserNotificationCenterCallbacks {
 
 impl private::Sealed for UserNotificationCenterCallbacks {}
 impl UserNotificationCenterDelegate for UserNotificationCenterCallbacks {
+    fn will_present_notification(
+        &mut self,
+        notification: Notification,
+    ) -> NotificationPresentationOptions {
+        self.will_present
+            .as_mut()
+            .map_or(NotificationPresentationOptions::NONE, |callback| {
+                callback(notification)
+            })
+    }
+
     fn did_receive_notification_response(&mut self, response: NotificationResponse) {
         if let Some(callback) = &mut self.response {
             callback(response);
@@ -135,6 +167,30 @@ extern "C" fn center_event_trampoline(user_info: *mut c_void, event_json: *const
     }));
 }
 
+extern "C" fn center_will_present_trampoline(
+    user_info: *mut c_void,
+    notification_json: *const c_char,
+) -> u64 {
+    catch_unwind(AssertUnwindSafe(|| {
+        if user_info.is_null() || notification_json.is_null() {
+            return NotificationPresentationOptions::NONE.bits();
+        }
+
+        let state = unsafe { &*(user_info as *const CallbackState) };
+        let json = unsafe { std::ffi::CStr::from_ptr(notification_json) }.to_string_lossy();
+        let Ok(payload) = serde_json::from_str::<NotificationPayload>(&json) else {
+            return NotificationPresentationOptions::NONE.bits();
+        };
+
+        let Ok(mut delegate) = state.delegate.lock() else {
+            return NotificationPresentationOptions::NONE.bits();
+        };
+
+        delegate.will_present_notification(payload.into()).bits()
+    }))
+    .unwrap_or(NotificationPresentationOptions::NONE.bits())
+}
+
 impl UserNotificationCenter {
     pub fn current() -> Result<Self, UserNotificationsError> {
         Self::current_inner(None)
@@ -158,7 +214,7 @@ impl UserNotificationCenter {
     ) -> Result<Self, UserNotificationsError> {
         let mut raw = core::ptr::null_mut();
         let mut error = core::ptr::null_mut();
-        let status = unsafe { ffi::un_center_current(&mut raw, &mut error) };
+        let status = unsafe { ffi::center::un_center_current(&mut raw, &mut error) };
         if status != ffi::status::OK {
             return Err(from_swift(status, error));
         }
@@ -202,9 +258,10 @@ impl UserNotificationCenter {
             });
         let mut error = core::ptr::null_mut();
         let status = unsafe {
-            ffi::un_center_set_delegate(
+            ffi::center::un_center_set_delegate(
                 self.raw,
-                Some(center_event_trampoline as ffi::CenterEventCallback),
+                Some(center_event_trampoline as ffi::center::CenterEventCallback),
+                Some(center_will_present_trampoline as ffi::center::CenterWillPresentCallback),
                 user_info,
                 &mut error,
             )
@@ -218,7 +275,7 @@ impl UserNotificationCenter {
     }
 
     pub fn clear_delegate(&mut self) {
-        unsafe { ffi::un_center_clear_delegate(self.raw) };
+        unsafe { ffi::center::un_center_clear_delegate(self.raw) };
         self.callback_state = None;
     }
 
@@ -229,7 +286,12 @@ impl UserNotificationCenter {
         let mut granted = false;
         let mut error = core::ptr::null_mut();
         let status = unsafe {
-            ffi::un_center_request_authorization(self.raw, options.bits(), &mut granted, &mut error)
+            ffi::center::un_center_request_authorization(
+                self.raw,
+                options.bits(),
+                &mut granted,
+                &mut error,
+            )
         };
         if status == ffi::status::OK {
             Ok(granted)
@@ -238,10 +300,24 @@ impl UserNotificationCenter {
         }
     }
 
+    #[must_use]
+    pub fn supports_content_extensions(&self) -> bool {
+        unsafe { ffi::center::un_center_supports_content_extensions(self.raw) }
+    }
+
+    pub fn set_badge_count(&self, new_badge_count: isize) -> Result<(), UserNotificationsError> {
+        let mut error = core::ptr::null_mut();
+        let status = unsafe { ffi::center::un_center_set_badge_count(self.raw, new_badge_count, &mut error) };
+        if status == ffi::status::OK {
+            Ok(())
+        } else {
+            Err(from_swift(status, error))
+        }
+    }
+
     pub fn notification_settings(&self) -> Result<NotificationSettings, UserNotificationsError> {
         let mut error = core::ptr::null_mut();
-        let payload =
-            unsafe { ffi::un_center_get_notification_settings_json(self.raw, &mut error) };
+        let payload = unsafe { ffi::un_center_get_notification_settings_json(self.raw, &mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
@@ -257,7 +333,11 @@ impl UserNotificationCenter {
         let categories = to_cstring(&categories)?;
         let mut error = core::ptr::null_mut();
         let status = unsafe {
-            ffi::un_center_set_notification_categories(self.raw, categories.as_ptr(), &mut error)
+            ffi::category::un_center_set_notification_categories(
+                self.raw,
+                categories.as_ptr(),
+                &mut error,
+            )
         };
         if status == ffi::status::OK {
             Ok(())
@@ -270,8 +350,9 @@ impl UserNotificationCenter {
         &self,
     ) -> Result<Vec<NotificationCategory>, UserNotificationsError> {
         let mut error = core::ptr::null_mut();
-        let payload =
-            unsafe { ffi::un_center_get_notification_categories_json(self.raw, &mut error) };
+        let payload = unsafe {
+            ffi::category::un_center_get_notification_categories_json(self.raw, &mut error)
+        };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
@@ -286,7 +367,7 @@ impl UserNotificationCenter {
         let request = encode_request_json(request)?;
         let request = to_cstring(&request)?;
         let mut error = core::ptr::null_mut();
-        let status = unsafe { ffi::un_center_add_request(self.raw, request.as_ptr(), &mut error) };
+        let status = unsafe { ffi::request::un_center_add_request(self.raw, request.as_ptr(), &mut error) };
         if status == ffi::status::OK {
             Ok(())
         } else {
@@ -298,7 +379,7 @@ impl UserNotificationCenter {
         &self,
     ) -> Result<Vec<NotificationRequest>, UserNotificationsError> {
         let mut error = core::ptr::null_mut();
-        let payload = unsafe { ffi::un_center_get_pending_requests_json(self.raw, &mut error) };
+        let payload = unsafe { ffi::request::un_center_get_pending_requests_json(self.raw, &mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
@@ -311,18 +392,19 @@ impl UserNotificationCenter {
         identifiers: &[&str],
     ) -> Result<(), UserNotificationsError> {
         let identifiers = encode_identifiers(identifiers)?;
-        unsafe { ffi::un_center_remove_pending_requests(self.raw, identifiers.as_ptr()) };
+        unsafe { ffi::request::un_center_remove_pending_requests(self.raw, identifiers.as_ptr()) };
         Ok(())
     }
 
     pub fn remove_all_pending_notification_requests(&self) {
-        unsafe { ffi::un_center_remove_all_pending_requests(self.raw) };
+        unsafe { ffi::request::un_center_remove_all_pending_requests(self.raw) };
     }
 
     pub fn delivered_notifications(&self) -> Result<Vec<Notification>, UserNotificationsError> {
         let mut error = core::ptr::null_mut();
-        let payload =
-            unsafe { ffi::un_center_get_delivered_notifications_json(self.raw, &mut error) };
+        let payload = unsafe {
+            ffi::response::un_center_get_delivered_notifications_json(self.raw, &mut error)
+        };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
@@ -335,21 +417,21 @@ impl UserNotificationCenter {
         identifiers: &[&str],
     ) -> Result<(), UserNotificationsError> {
         let identifiers = encode_identifiers(identifiers)?;
-        unsafe { ffi::un_center_remove_delivered_notifications(self.raw, identifiers.as_ptr()) };
+        unsafe { ffi::response::un_center_remove_delivered_notifications(self.raw, identifiers.as_ptr()) };
         Ok(())
     }
 
     pub fn remove_all_delivered_notifications(&self) {
-        unsafe { ffi::un_center_remove_all_delivered_notifications(self.raw) };
+        unsafe { ffi::response::un_center_remove_all_delivered_notifications(self.raw) };
     }
 }
 
 impl Drop for UserNotificationCenter {
     fn drop(&mut self) {
         if self.callback_state.is_some() {
-            unsafe { ffi::un_center_clear_delegate(self.raw) };
+            unsafe { ffi::center::un_center_clear_delegate(self.raw) };
         }
-        unsafe { ffi::un_object_release(self.raw) };
+        unsafe { ffi::core::un_object_release(self.raw) };
     }
 }
 

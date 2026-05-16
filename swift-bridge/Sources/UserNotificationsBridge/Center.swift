@@ -2,16 +2,30 @@ import Dispatch
 import Foundation
 import UserNotifications
 
+struct UNCenterEventPayload: Codable {
+    var event: String
+    var notification: UNNotificationPayload?
+    var response: UNNotificationResponsePayload?
+}
+
 public typealias UNCenterEventCallback =
     @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> Void
+public typealias UNCenterWillPresentCallback =
+    @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> UInt64
 
 private final class UNRustCenterDelegate: NSObject, UNUserNotificationCenterDelegate {
-    let callback: UNCenterEventCallback
+    let eventCallback: UNCenterEventCallback?
+    let willPresentCallback: UNCenterWillPresentCallback?
     let userInfo: UnsafeMutableRawPointer?
     private var isActive = true
 
-    init(callback: @escaping UNCenterEventCallback, userInfo: UnsafeMutableRawPointer?) {
-        self.callback = callback
+    init(
+        eventCallback: UNCenterEventCallback?,
+        willPresentCallback: UNCenterWillPresentCallback?,
+        userInfo: UnsafeMutableRawPointer?
+    ) {
+        self.eventCallback = eventCallback
+        self.willPresentCallback = willPresentCallback
         self.userInfo = userInfo
         super.init()
     }
@@ -20,10 +34,28 @@ private final class UNRustCenterDelegate: NSObject, UNUserNotificationCenterDele
         isActive = false
     }
 
-    private func send(_ payload: [String: Any]) {
-        guard isActive else { return }
-        let json = un_json_string(payload)
-        json.withCString { callback(userInfo, $0) }
+    private func send(_ payload: UNCenterEventPayload) {
+        guard isActive, let eventCallback else { return }
+        let json = un_encode_json(payload)
+        json.withCString { eventCallback(userInfo, $0) }
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        guard isActive else {
+            completionHandler([])
+            return
+        }
+        guard let willPresentCallback else {
+            completionHandler([])
+            return
+        }
+        let json = un_encode_json(un_notification_payload(notification))
+        let bits = json.withCString { willPresentCallback(userInfo, $0) }
+        completionHandler(UNNotificationPresentationOptions(rawValue: UInt(bits)))
     }
 
     func userNotificationCenter(
@@ -31,10 +63,11 @@ private final class UNRustCenterDelegate: NSObject, UNUserNotificationCenterDele
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        send([
-            "event": "didReceiveNotificationResponse",
-            "response": un_response_object(response),
-        ])
+        send(UNCenterEventPayload(
+            event: "didReceiveNotificationResponse",
+            notification: nil,
+            response: un_response_payload(response)
+        ))
         completionHandler()
     }
 
@@ -42,10 +75,11 @@ private final class UNRustCenterDelegate: NSObject, UNUserNotificationCenterDele
         _ center: UNUserNotificationCenter,
         openSettingsFor notification: UNNotification?
     ) {
-        send([
-            "event": "openSettingsForNotification",
-            "notification": notification.map(un_notification_object) ?? NSNull(),
-        ])
+        send(UNCenterEventPayload(
+            event: "openSettingsForNotification",
+            notification: notification.map(un_notification_payload),
+            response: nil
+        ))
     }
 }
 
@@ -103,24 +137,28 @@ public func un_center_current(
     guard let center = un_current_notification_center(errorOut) else {
         return UNR_FRAMEWORK_ERROR
     }
-    let box = UNUserNotificationCenterBox(center: center)
-    outCenter.pointee = un_retain(box)
+    outCenter.pointee = un_retain(UNUserNotificationCenterBox(center: center))
     return UNR_OK
 }
 
 @_cdecl("un_center_set_delegate")
 public func un_center_set_delegate(
     _ centerPtr: UnsafeMutableRawPointer?,
-    _ callback: UNCenterEventCallback?,
+    _ eventCallback: UNCenterEventCallback?,
+    _ willPresentCallback: UNCenterWillPresentCallback?,
     _ userInfo: UnsafeMutableRawPointer?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
-    guard let box = un_center_box(centerPtr), let callback else {
-        un_write_error(errorOut, "notification center and callback must not be null")
+    guard let box = un_center_box(centerPtr) else {
+        un_write_error(errorOut, "notification center must not be null")
         return UNR_INVALID_ARGUMENT
     }
 
-    let delegateBox = UNRustCenterDelegate(callback: callback, userInfo: userInfo)
+    let delegateBox = UNRustCenterDelegate(
+        eventCallback: eventCallback,
+        willPresentCallback: willPresentCallback,
+        userInfo: userInfo
+    )
     box.setDelegateBox(delegateBox)
     return UNR_OK
 }
@@ -156,7 +194,42 @@ public func un_center_request_authorization(
 
     outGranted.pointee = granted
     if let completionError {
-        un_write_error(errorOut, completionError.localizedDescription)
+        un_write_error(errorOut, error: completionError)
+        return UNR_FRAMEWORK_ERROR
+    }
+    return UNR_OK
+}
+
+@_cdecl("un_center_supports_content_extensions")
+public func un_center_supports_content_extensions(_ centerPtr: UnsafeMutableRawPointer?) -> Bool {
+    un_center_box(centerPtr)?.center.supportsContentExtensions ?? false
+}
+
+@_cdecl("un_center_set_badge_count")
+public func un_center_set_badge_count(
+    _ centerPtr: UnsafeMutableRawPointer?,
+    _ newBadgeCount: Int,
+    _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> Int32 {
+    guard let center = un_center_box(centerPtr)?.center else {
+        un_write_error(errorOut, "notification center must not be null")
+        return UNR_INVALID_ARGUMENT
+    }
+    guard #available(macOS 13.0, *) else {
+        un_write_error(errorOut, "setBadgeCount requires macOS 13 or newer")
+        return UNR_FRAMEWORK_ERROR
+    }
+
+    let semaphore = DispatchSemaphore(value: 0)
+    var completionError: Error?
+    center.setBadgeCount(newBadgeCount) {
+        completionError = $0
+        semaphore.signal()
+    }
+    semaphore.wait()
+
+    if let completionError {
+        un_write_error(errorOut, error: completionError)
         return UNR_FRAMEWORK_ERROR
     }
     return UNR_OK
@@ -173,13 +246,14 @@ public func un_center_get_notification_settings_json(
     }
 
     let semaphore = DispatchSemaphore(value: 0)
-    var json = "null"
+    var payload: UNNotificationSettingsPayload?
     center.getNotificationSettings {
-        json = un_json_string(un_settings_object($0))
+        payload = un_settings_payload($0)
         semaphore.signal()
     }
     semaphore.wait()
-    return un_string(json)
+
+    return payload.map(un_encode_json).flatMap(un_string)
 }
 
 @_cdecl("un_center_set_notification_categories")
@@ -198,7 +272,7 @@ public func un_center_set_notification_categories(
         center.setNotificationCategories(Set(payloads.map(un_make_category)))
         return UNR_OK
     } catch {
-        un_write_error(errorOut, error.localizedDescription)
+        un_write_error(errorOut, error: error)
         return UNR_INVALID_ARGUMENT
     }
 }
@@ -214,14 +288,15 @@ public func un_center_get_notification_categories_json(
     }
 
     let semaphore = DispatchSemaphore(value: 0)
-    var json = "[]"
+    var payloads: [UNNotificationCategoryPayload] = []
     center.getNotificationCategories {
-        let categories = Array($0).sorted { $0.identifier < $1.identifier }
-        json = un_json_string(categories.map(un_category_object))
+        payloads = Array($0)
+            .sorted { $0.identifier < $1.identifier }
+            .map { un_category_payload($0) }
         semaphore.signal()
     }
     semaphore.wait()
-    return un_string(json)
+    return un_string(un_encode_json(payloads))
 }
 
 @_cdecl("un_center_add_request")
@@ -246,12 +321,12 @@ public func un_center_add_request(
         }
         semaphore.wait()
         if let completionError {
-            un_write_error(errorOut, completionError.localizedDescription)
+            un_write_error(errorOut, error: completionError)
             return UNR_FRAMEWORK_ERROR
         }
         return UNR_OK
     } catch {
-        un_write_error(errorOut, error.localizedDescription)
+        un_write_error(errorOut, error: error)
         return UNR_INVALID_ARGUMENT
     }
 }
@@ -267,14 +342,15 @@ public func un_center_get_pending_requests_json(
     }
 
     let semaphore = DispatchSemaphore(value: 0)
-    var json = "[]"
+    var payloads: [UNNotificationRequestPayload] = []
     center.getPendingNotificationRequests {
-        let requests = $0.sorted { $0.identifier < $1.identifier }
-        json = un_json_string(requests.map(un_request_object))
+        payloads = $0
+            .sorted { $0.identifier < $1.identifier }
+            .map { un_request_payload($0) }
         semaphore.signal()
     }
     semaphore.wait()
-    return un_string(json)
+    return un_string(un_encode_json(payloads))
 }
 
 @_cdecl("un_center_remove_pending_requests")
@@ -307,14 +383,15 @@ public func un_center_get_delivered_notifications_json(
     }
 
     let semaphore = DispatchSemaphore(value: 0)
-    var json = "[]"
+    var payloads: [UNNotificationPayload] = []
     center.getDeliveredNotifications {
-        let notifications = $0.sorted { $0.request.identifier < $1.request.identifier }
-        json = un_json_string(notifications.map(un_notification_object))
+        payloads = $0
+            .sorted { $0.request.identifier < $1.request.identifier }
+            .map(un_notification_payload)
         semaphore.signal()
     }
     semaphore.wait()
-    return un_string(json)
+    return un_string(un_encode_json(payloads))
 }
 
 @_cdecl("un_center_remove_delivered_notifications")

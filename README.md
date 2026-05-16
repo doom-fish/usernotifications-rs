@@ -1,26 +1,28 @@
 # usernotifications
 
-Safe, idiomatic Rust bindings for Apple's [UserNotifications](https://developer.apple.com/documentation/usernotifications) framework on macOS.
+Safe, idiomatic Rust bindings for Apple's [UserNotifications](https://developer.apple.com/documentation/usernotifications) and `UserNotificationsUI` frameworks on macOS.
 
-## Features
+## 0.2.0 highlights
 
-- **Authorization + settings** — query notification authorization state and detailed `UserNotifications` settings without prompting the user.
-- **Request management** — create notification content and schedule local requests with immediate, time-interval, or calendar triggers.
-- **Categories + actions** — configure notification categories, regular actions, and text-input actions.
-- **Delivered + pending snapshots** — inspect pending requests and delivered notifications as plain Rust data structures.
-- **Delegate callbacks** — receive `didReceiveNotificationResponse` and `openSettingsForNotification` callbacks through Rust closures or traits.
+- 11 logical coverage areas with one Rust module and one Swift bridge file per area.
+- Expanded `UNUserNotificationCenter` coverage for settings, categories, delivered/pending notifications, delegate callbacks, `supportsContentExtensions`, and `setBadgeCount`.
+- Rich model coverage for requests, content, triggers, categories, actions, attachments, responses, and settings.
+- Rust-friendly simulator/context wrappers for `UNNotificationServiceExtension` and `UNNotificationContentExtension`.
+- 11 examples plus integration tests spanning every logical area.
+- A checked-in [COVERAGE.md](COVERAGE.md) matrix documenting implemented, simulated, and macOS-unavailable SDK surface.
 
 ## Requirements
 
 - macOS 10.14 or newer
-- Xcode 15+ with the macOS SDK
+- Xcode 15+ with a recent macOS SDK
+- Some APIs are availability-gated by Apple (`UNNotificationContentExtension` on macOS 11+, action icons / interruption metadata on macOS 12+, badge count / filter criteria on macOS 13+)
 - For authorization and local-notification delivery in GUI apps, the app must run with the appropriate notification entitlements and user consent
 
 ## Installation
 
 ```toml
 [dependencies]
-usernotifications-rs = "0.1.0"
+usernotifications-rs = "0.2.0"
 ```
 
 ```rust,no_run
@@ -30,23 +32,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let center = UserNotificationCenter::current()?;
     let settings = center.notification_settings()?;
     println!("authorization = {:?}", settings.authorization_status);
+    println!("supports_content_extensions = {}", center.supports_content_extensions());
     Ok(())
 }
 ```
 
-## Smoke example
+## Example catalog
+
+| Example | Area |
+| --- | --- |
+| `01_smoke` | `UNUserNotificationCenter` smoke / bundle bootstrap |
+| `02_request_roundtrip` | `UNNotificationRequest` |
+| `03_content_roundtrip` | `UNNotificationContent` |
+| `04_trigger_roundtrip` | `UNNotificationTrigger` |
+| `05_category_roundtrip` | `UNNotificationCategory` |
+| `06_action_roundtrip` | `UNNotificationAction` / `UNNotificationActionIcon` |
+| `07_attachment_roundtrip` | `UNNotificationAttachment` |
+| `08_response_constants` | `UNNotificationResponse` constants |
+| `09_settings_from_center` | `UNNotificationSettings` via center |
+| `10_service_extension_simulator` | `UNNotificationServiceExtension` simulator |
+| `11_content_extension_simulator` | `UNNotificationContentExtension` simulator/context |
+
+Run any example with:
 
 ```bash
 cargo run --example 01_smoke
 ```
 
-The smoke example reads the current notification settings and configured categories. It does **not** request authorization or schedule a notification, so it should not trigger a permission prompt. When launched from `cargo run`, it re-bundles itself under `target/debug/examples/01_smoke.app` before touching `UserNotifications`, because Apple requires a macOS app bundle.
-
 ## Notes
 
-- `UNLocationNotificationTrigger` is unavailable on macOS, so this crate intentionally exposes only immediate, time-interval, and calendar scheduling for local notifications.
-- Delegate callbacks require running inside an application context that is allowed to install a `UNUserNotificationCenter` delegate.
+- `UNUserNotificationCenter::current()` must run from a macOS app bundle. The bundle-aware examples re-launch themselves from `target/debug/examples/*.app` when started via `cargo run`.
+- `LocalizedNotificationString` is the Rust representation of Apple's `localizedUserNotificationStringForKey:arguments:` localization flow.
+- Extension APIs are exposed as simulator/context wrappers rather than generated Xcode extension targets, which keeps the crate usable from ordinary Rust test and example binaries.
 - Notification `user_info` values are surfaced as `serde_json::Value` for lossless JSON-friendly transport across the Swift bridge.
+- Platform-unavailable APIs such as `UNLocationNotificationTrigger` are documented explicitly in [COVERAGE.md](COVERAGE.md).
 
 ## License
 

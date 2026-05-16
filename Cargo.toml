@@ -1,11 +1,11 @@
 [package]
 name = "usernotifications-rs"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/doom-fish/usernotifications-rs"
 repository = "https://github.com/doom-fish/usernotifications-rs"
-description = "Safe Rust bindings for Apple's UserNotifications framework on macOS"
+description = "Safe Rust bindings for Apple's UserNotifications and UserNotificationsUI frameworks on macOS"
 authors = ["Per Johansson <per@doom.fish>"]
 keywords = ["usernotifications", "notifications", "macos", "apple"]
 categories = ["api-bindings", "os::macos-apis"]
@@ -20,6 +20,7 @@ include = [
     "build.rs",
     "Cargo.toml",
     "README.md",
+    "COVERAGE.md",
     "LICENSE-*",
     "CHANGELOG.md",
 ]

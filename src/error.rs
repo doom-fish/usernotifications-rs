@@ -5,6 +5,46 @@ use libc::free;
 
 use crate::ffi;
 
+pub const USER_NOTIFICATIONS_ERROR_DOMAIN: &str = "UNErrorDomain";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
+pub enum UserNotificationsFrameworkErrorCode {
+    NotificationsNotAllowed = 1,
+    AttachmentInvalidUrl = 100,
+    AttachmentUnrecognizedType = 101,
+    AttachmentInvalidFileSize = 102,
+    AttachmentNotInDataStore = 103,
+    AttachmentMoveIntoDataStoreFailed = 104,
+    AttachmentCorrupt = 105,
+    NotificationInvalidNoDate = 1400,
+    NotificationInvalidNoContent = 1401,
+    ContentProvidingObjectNotAllowed = 1500,
+    ContentProvidingInvalid = 1501,
+    BadgeInputInvalid = 1600,
+}
+
+impl UserNotificationsFrameworkErrorCode {
+    #[must_use]
+    pub const fn from_raw(raw: i32) -> Option<Self> {
+        match raw {
+            1 => Some(Self::NotificationsNotAllowed),
+            100 => Some(Self::AttachmentInvalidUrl),
+            101 => Some(Self::AttachmentUnrecognizedType),
+            102 => Some(Self::AttachmentInvalidFileSize),
+            103 => Some(Self::AttachmentNotInDataStore),
+            104 => Some(Self::AttachmentMoveIntoDataStoreFailed),
+            105 => Some(Self::AttachmentCorrupt),
+            1400 => Some(Self::NotificationInvalidNoDate),
+            1401 => Some(Self::NotificationInvalidNoContent),
+            1500 => Some(Self::ContentProvidingObjectNotAllowed),
+            1501 => Some(Self::ContentProvidingInvalid),
+            1600 => Some(Self::BadgeInputInvalid),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum UserNotificationsError {

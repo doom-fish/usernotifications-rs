@@ -21,9 +21,19 @@ public func un_object_release(_ ptr: UnsafeMutableRawPointer?) {
     Unmanaged<AnyObject>.fromOpaque(ptr).release()
 }
 
+@_cdecl("un_error_domain")
+public func un_error_domain() -> UnsafeMutablePointer<CChar>? {
+    un_string(UNErrorDomain)
+}
+
 @inline(__always)
 func un_string(_ value: String) -> UnsafeMutablePointer<CChar>? {
     value.withCString { strdup($0) }
+}
+
+func un_error_message(_ error: Error) -> String {
+    let nsError = error as NSError
+    return "\(nsError.domain):\(nsError.code):\(nsError.localizedDescription)"
 }
 
 @inline(__always)
@@ -34,55 +44,23 @@ func un_write_error(
     errorOut?.pointee = un_string(message)
 }
 
-func un_json_safe(_ value: Any) -> Any {
-    switch value {
-    case let dict as [String: Any]:
-        return dict.mapValues(un_json_safe)
-    case let dict as NSDictionary:
-        var object: [String: Any] = [:]
-        for (key, value) in dict {
-            object[String(describing: key)] = un_json_safe(value)
-        }
-        return object
-    case let array as [Any]:
-        return array.map(un_json_safe)
-    case let array as NSArray:
-        return array.map(un_json_safe)
-    case let date as Date:
-        return date.timeIntervalSince1970
-    case let number as NSNumber:
-        return number
-    case let string as String:
-        return string
-    case _ as NSNull:
-        return NSNull()
-    default:
-        return String(describing: value)
-    }
+@inline(__always)
+func un_write_error(
+    _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
+    error: Error
+) {
+    un_write_error(errorOut, un_error_message(error))
 }
 
-func un_json_string(_ value: Any) -> String {
-    let safe = un_json_safe(value)
-
-    func encode(_ object: Any) -> String? {
-        guard JSONSerialization.isValidJSONObject(object) else {
-            return nil
-        }
-        do {
-            let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
-            return String(data: data, encoding: .utf8)
-        } catch {
-            return nil
-        }
+func un_encode_json<T: Encodable>(_ value: T) -> String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    guard let data = try? encoder.encode(value),
+          let string = String(data: data, encoding: .utf8)
+    else {
+        return "null"
     }
-
-    if let encoded = encode(safe) {
-        return encoded
-    }
-    if let encodedScalar = encode([safe]) {
-        return String(encodedScalar.dropFirst().dropLast())
-    }
-    return "null"
+    return string
 }
 
 enum UNJSONValue: Codable {
@@ -108,7 +86,10 @@ enum UNJSONValue: Codable {
         } else if let value = try? container.decode([UNJSONValue].self) {
             self = .array(value)
         } else {
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "unsupported JSON value")
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "unsupported JSON value"
+            )
         }
     }
 
@@ -130,6 +111,35 @@ enum UNJSONValue: Codable {
         }
     }
 
+    static func fromFoundationObject(_ value: Any) -> UNJSONValue {
+        switch value {
+        case let string as String:
+            return .string(string)
+        case let number as NSNumber where CFGetTypeID(number) == CFBooleanGetTypeID():
+            return .bool(number.boolValue)
+        case let number as NSNumber:
+            return .number(number.doubleValue)
+        case let dict as [String: Any]:
+            return .object(dict.mapValues(Self.fromFoundationObject))
+        case let dict as NSDictionary:
+            var object: [String: UNJSONValue] = [:]
+            for (key, value) in dict {
+                object[String(describing: key)] = Self.fromFoundationObject(value)
+            }
+            return .object(object)
+        case let array as [Any]:
+            return .array(array.map(Self.fromFoundationObject))
+        case let array as NSArray:
+            return .array(array.map(Self.fromFoundationObject))
+        case let date as Date:
+            return .number(date.timeIntervalSince1970)
+        case _ as NSNull:
+            return .null
+        default:
+            return .string(String(describing: value))
+        }
+    }
+
     var foundationObject: Any {
         switch self {
         case .string(let value):
@@ -146,6 +156,21 @@ enum UNJSONValue: Codable {
             return NSNull()
         }
     }
+}
+
+struct UNLocalizedStringPayload: Codable {
+    var key: String
+    var arguments: [UNJSONValue]
+}
+
+func un_make_localized_string(_ localized: UNLocalizedStringPayload?, fallback: String) -> String {
+    guard let localized else {
+        return fallback
+    }
+    return NSString.localizedUserNotificationString(
+        forKey: localized.key,
+        arguments: localized.arguments.map(\.foundationObject)
+    ) as String
 }
 
 func un_decode_json<T: Decodable>(_ cString: UnsafePointer<CChar>?, as type: T.Type) throws -> T {
