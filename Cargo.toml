@@ -37,7 +37,7 @@ name = "usernotifications"
 crate-type = ["lib"]
 
 [dependencies]
-apple-cf = { version = ">=0.4.0, <0.6", default-features = false }
+apple-cf = { version = ">=0.4, <0.8", default-features = false }
 doom-fish-utils = { path = "../doom-fish-utils", version = "0.1" }
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }
