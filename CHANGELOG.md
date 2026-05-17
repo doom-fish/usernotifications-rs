@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.3.0] - 2026-05-17
+## [0.3.0] - 2025-05-17
 
 - Added `async_api` module with async/await wrappers for completion-based APIs when the `async` feature is enabled.
   - `AsyncUserNotificationCenter::request_authorization()` — async authorization requests
