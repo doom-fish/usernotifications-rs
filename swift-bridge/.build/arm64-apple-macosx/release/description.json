@@ -1,0 +1,490 @@
+{
+  "builtTestProducts" : [
+
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.UserNotificationsBridge-arm64-apple-macosx26.0-release.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/sources",
+      "importPath" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Action.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Async.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Attachment.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Category.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Center.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Content.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/ContentExtension.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Core.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Notification.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Request.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Response.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/ServiceExtension.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Settings.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Trigger.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "UserNotificationsBridge",
+      "moduleOutputPath" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/Modules/UserNotificationsBridge.swiftmodule",
+      "objects" : [
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Action.swift.o",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Async.swift.o",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Attachment.swift.o",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Category.swift.o",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Center.swift.o",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Content.swift.o",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/ContentExtension.swift.o",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Core.swift.o",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Notification.swift.o",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Request.swift.o",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Response.swift.o",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/ServiceExtension.swift.o",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Settings.swift.o",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Trigger.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx10.14",
+        "-whole-module-optimization",
+        "-num-threads",
+        "16",
+        "-serialize-diagnostics",
+        "-O",
+        "-j16",
+        "-DSWIFT_PACKAGE",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/include/UserNotificationsBridge-Swift.h",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "swift_bridge"
+      ],
+      "outputFileMapPath" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Action.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Async.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Attachment.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Category.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Center.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Content.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/ContentExtension.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Core.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Notification.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Request.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Response.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/ServiceExtension.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Settings.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Trigger.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/Modules/UserNotificationsBridge.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Action.swift",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Async.swift",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Attachment.swift",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Category.swift",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Center.swift",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Content.swift",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/ContentExtension.swift",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Core.swift",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Notification.swift",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Request.swift",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Response.swift",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/ServiceExtension.swift",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Settings.swift",
+        "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Trigger.swift"
+      ],
+      "tempsPath" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build",
+      "wholeModuleOptimization" : true
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "UserNotificationsBridge" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "UserNotificationsBridge",
+      "-package-name",
+      "swift_bridge",
+      "-c",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Action.swift",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Async.swift",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Attachment.swift",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Category.swift",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Center.swift",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Content.swift",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/ContentExtension.swift",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Core.swift",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Notification.swift",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Request.swift",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Response.swift",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/ServiceExtension.swift",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Settings.swift",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Trigger.swift",
+      "-I",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/Modules",
+      "-target",
+      "arm64-apple-macosx10.14",
+      "-whole-module-optimization",
+      "-num-threads",
+      "16",
+      "-serialize-diagnostics",
+      "-O",
+      "-j16",
+      "-DSWIFT_PACKAGE",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/include/UserNotificationsBridge-Swift.h",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "swift_bridge",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "UserNotificationsBridge" : [
+
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Action.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Async.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Attachment.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Category.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Center.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Content.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/ContentExtension.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Core.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Notification.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Request.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Response.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/ServiceExtension.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Settings.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Trigger.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/sources"
+    },
+    "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Action.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Async.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Attachment.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Category.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Center.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Content.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/ContentExtension.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Core.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Notification.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Request.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Response.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/ServiceExtension.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Settings.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/Trigger.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.product/Objects.LinkFileList"
+    },
+    "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+    }
+  }
+}

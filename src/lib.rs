@@ -33,6 +33,9 @@ pub mod service_extension;
 pub mod settings;
 pub mod trigger;
 
+#[cfg(feature = "async")]
+pub mod async_api;
+
 pub use action::{NotificationAction, NotificationActionIcon, NotificationActionOptions};
 pub use attachment::{
     AttachmentThumbnailClippingRect, AttachmentThumbnailTime, NotificationAttachment,

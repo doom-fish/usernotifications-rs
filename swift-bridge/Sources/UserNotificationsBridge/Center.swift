@@ -114,6 +114,11 @@ private func un_center_box(_ ptr: UnsafeMutableRawPointer?) -> UNUserNotificatio
     return box
 }
 
+// Public function for async APIs to access the center
+func un_center_unwrap(_ ptr: UnsafeMutableRawPointer?) -> UNUserNotificationCenter? {
+    un_center_box(ptr)?.center
+}
+
 private func un_current_notification_center(
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UNUserNotificationCenter? {

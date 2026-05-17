@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0] - 2026-05-17
+
+- Added `async_api` module with async/await wrappers for completion-based APIs when the `async` feature is enabled.
+  - `AsyncUserNotificationCenter::request_authorization()` — async authorization requests
+  - `AsyncUserNotificationCenter::add_notification_request()` — async request scheduling
+  - `AsyncUserNotificationCenter::get_delivered_notifications()` — async delivered notification retrieval
+  - `AsyncUserNotificationCenter::get_pending_notification_requests()` — async pending request retrieval
+  - `AsyncUserNotificationCenter::get_notification_categories()` — async category retrieval
+  - `AsyncUserNotificationCenter::get_notification_settings()` — async settings retrieval
+- All async operations use callback-based Swift FFI with `doom-fish-utils::completion` for true executor-agnostic async/await support.
+
 ## [0.2.1] - 2026-05-17
 
 - Added macOS 15 content-provider coverage with the sealed `NotificationContentProviding` trait, `NotificationContent::updating_from`, and the Intents-backed `NotificationAttributedMessageContext` helper.

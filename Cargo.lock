@@ -9,6 +9,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f18f9f1747c86d067ade130403a7bfc1ba3609de64d4b69ea0ac3296f3052d08"
 
 [[package]]
+name = "doom-fish-utils"
+version = "0.1.0"
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -25,6 +29,12 @@ name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
+
+[[package]]
+name = "pollster"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22686f4785f02a4fcc856d3b3bb19bf6c8160d103f7a99cc258bddd0251dc7f2"
 
 [[package]]
 name = "proc-macro2"
@@ -106,10 +116,12 @@ checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
 
 [[package]]
 name = "usernotifications-rs"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "apple-cf",
+ "doom-fish-utils",
  "libc",
+ "pollster",
  "serde",
  "serde_json",
 ]

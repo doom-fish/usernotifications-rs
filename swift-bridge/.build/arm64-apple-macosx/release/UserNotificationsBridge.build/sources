@@ -1,0 +1,14 @@
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Action.swift
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Async.swift
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Attachment.swift
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Category.swift
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Center.swift
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Content.swift
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/ContentExtension.swift
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Core.swift
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Notification.swift
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Request.swift
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Response.swift
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/ServiceExtension.swift
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Settings.swift
+/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/Sources/UserNotificationsBridge/Trigger.swift

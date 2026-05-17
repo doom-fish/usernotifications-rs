@@ -424,6 +424,11 @@ impl UserNotificationCenter {
     pub fn remove_all_delivered_notifications(&self) {
         unsafe { ffi::response::un_center_remove_all_delivered_notifications(self.raw) };
     }
+
+    #[cfg(feature = "async")]
+    pub(crate) fn as_raw(&self) -> *mut c_void {
+        self.raw
+    }
 }
 
 impl Drop for UserNotificationCenter {

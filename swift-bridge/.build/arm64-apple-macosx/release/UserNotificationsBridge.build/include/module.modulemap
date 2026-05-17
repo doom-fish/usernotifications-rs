@@ -1,0 +1,3 @@
+module UserNotificationsBridge {
+    header "/Users/perjohansson/dev/doomfish/usernotifications-rs/swift-bridge/.build/arm64-apple-macosx/release/UserNotificationsBridge.build/include/UserNotificationsBridge-Swift.h"
+}
