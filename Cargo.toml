@@ -1,6 +1,6 @@
 [package]
 name = "usernotifications-rs"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/doom-fish/usernotifications-rs"
@@ -37,7 +37,7 @@ name = "usernotifications"
 crate-type = ["lib"]
 
 [dependencies]
-apple-cf = { version = ">=0.4, <0.9", default-features = false }
+apple-cf = { version = ">=0.4, <0.10", default-features = false }
 doom-fish-utils = { path = "../doom-fish-utils", version = "0.1" }
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }
