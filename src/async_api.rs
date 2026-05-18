@@ -18,8 +18,7 @@
 //! # Examples
 //!
 //! ```no_run
-//! # #[tokio::main]
-//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # async fn demo() -> Result<(), Box<dyn std::error::Error>> {
 //! use usernotifications::prelude::*;
 //! use usernotifications::async_api::AsyncUserNotificationCenter;
 //!
@@ -80,6 +79,7 @@ extern "C" fn request_authorization_callback(
     }
 }
 
+/// Future returned by async `UNUserNotificationCenter.requestAuthorization` wrappers.
 pub struct RequestAuthorizationFuture {
     inner: AsyncCompletionFuture<bool>,
 }
@@ -110,6 +110,7 @@ extern "C" fn add_request_callback(_result: *const c_void, error: *const i8, ctx
     }
 }
 
+/// Future returned by async `UNUserNotificationCenter.addNotificationRequest` wrappers.
 pub struct AddRequestFuture {
     inner: AsyncCompletionFuture<()>,
 }
@@ -144,20 +145,26 @@ extern "C" fn get_delivered_callback(result: *const c_void, error: *const i8, ct
                 unsafe {
                     AsyncCompletion::<Vec<Notification>>::complete_ok(ctx, notifications);
                 }
-            },
+            }
             Err(e) => {
                 // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<Notification>> created by AsyncCompletion::create().
                 unsafe {
-                    AsyncCompletion::<Vec<Notification>>::complete_err(ctx, e.message().to_string());
+                    AsyncCompletion::<Vec<Notification>>::complete_err(
+                        ctx,
+                        e.message().to_string(),
+                    );
                 }
-            },
+            }
         }
     } else {
         // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<Notification>> created by AsyncCompletion::create().
-        unsafe { AsyncCompletion::<Vec<Notification>>::complete_err(ctx, "Unknown error".to_string()) };
+        unsafe {
+            AsyncCompletion::<Vec<Notification>>::complete_err(ctx, "Unknown error".to_string());
+        };
     }
 }
 
+/// Future returned by async delivered-notification queries on `UNUserNotificationCenter`.
 pub struct GetDeliveredFuture {
     inner: AsyncCompletionFuture<Vec<Notification>>,
 }
@@ -192,7 +199,7 @@ extern "C" fn get_pending_callback(result: *const c_void, error: *const i8, ctx:
                 unsafe {
                     AsyncCompletion::<Vec<NotificationRequest>>::complete_ok(ctx, requests);
                 }
-            },
+            }
             Err(e) => {
                 // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationRequest>> created by AsyncCompletion::create().
                 unsafe {
@@ -201,16 +208,20 @@ extern "C" fn get_pending_callback(result: *const c_void, error: *const i8, ctx:
                         e.message().to_string(),
                     );
                 }
-            },
+            }
         }
     } else {
         // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationRequest>> created by AsyncCompletion::create().
         unsafe {
-            AsyncCompletion::<Vec<NotificationRequest>>::complete_err(ctx, "Unknown error".to_string());
+            AsyncCompletion::<Vec<NotificationRequest>>::complete_err(
+                ctx,
+                "Unknown error".to_string(),
+            );
         };
     }
 }
 
+/// Future returned by async pending-request queries on `UNUserNotificationCenter`.
 pub struct GetPendingFuture {
     inner: AsyncCompletionFuture<Vec<NotificationRequest>>,
 }
@@ -245,7 +256,7 @@ extern "C" fn get_categories_callback(result: *const c_void, error: *const i8, c
                 unsafe {
                     AsyncCompletion::<Vec<NotificationCategory>>::complete_ok(ctx, categories);
                 }
-            },
+            }
             Err(e) => {
                 // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationCategory>> created by AsyncCompletion::create().
                 unsafe {
@@ -254,16 +265,20 @@ extern "C" fn get_categories_callback(result: *const c_void, error: *const i8, c
                         e.message().to_string(),
                     );
                 }
-            },
+            }
         }
     } else {
         // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationCategory>> created by AsyncCompletion::create().
         unsafe {
-            AsyncCompletion::<Vec<NotificationCategory>>::complete_err(ctx, "Unknown error".to_string());
+            AsyncCompletion::<Vec<NotificationCategory>>::complete_err(
+                ctx,
+                "Unknown error".to_string(),
+            );
         };
     }
 }
 
+/// Future returned by async category queries on `UNUserNotificationCenter`.
 pub struct GetCategoriesFuture {
     inner: AsyncCompletionFuture<Vec<NotificationCategory>>,
 }
@@ -298,13 +313,16 @@ extern "C" fn get_settings_callback(result: *const c_void, error: *const i8, ctx
                 unsafe {
                     AsyncCompletion::<NotificationSettings>::complete_ok(ctx, settings);
                 }
-            },
+            }
             Err(e) => {
                 // SAFETY: ctx is a valid pointer to AsyncCompletion<NotificationSettings> created by AsyncCompletion::create().
                 unsafe {
-                    AsyncCompletion::<NotificationSettings>::complete_err(ctx, e.message().to_string());
+                    AsyncCompletion::<NotificationSettings>::complete_err(
+                        ctx,
+                        e.message().to_string(),
+                    );
                 }
-            },
+            }
         }
     } else {
         // SAFETY: ctx is a valid pointer to AsyncCompletion<NotificationSettings> created by AsyncCompletion::create().
@@ -314,6 +332,7 @@ extern "C" fn get_settings_callback(result: *const c_void, error: *const i8, ctx
     }
 }
 
+/// Future returned by async settings queries on `UNUserNotificationCenter`.
 pub struct GetSettingsFuture {
     inner: AsyncCompletionFuture<NotificationSettings>,
 }
@@ -369,8 +388,8 @@ impl AsyncUserNotificationCenter {
         center: &crate::UserNotificationCenter,
         request: &crate::NotificationRequest,
     ) -> Result<AddRequestFuture, UserNotificationsError> {
-        use crate::request::encode_request_json;
         use crate::private::to_cstring;
+        use crate::request::encode_request_json;
 
         let request_json = encode_request_json(request)?;
         let request_cstring = to_cstring(&request_json)?;
@@ -461,9 +480,7 @@ impl AsyncUserNotificationCenter {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn get_notification_settings(
-        center: &crate::UserNotificationCenter,
-    ) -> GetSettingsFuture {
+    pub fn get_notification_settings(center: &crate::UserNotificationCenter) -> GetSettingsFuture {
         let (future, ctx) = AsyncCompletion::<NotificationSettings>::create();
         // SAFETY: center.as_raw() returns a valid ObjC handle, ctx is a valid context pointer
         // created by AsyncCompletion::create(), and get_settings_callback is an extern "C" fn

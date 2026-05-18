@@ -9,23 +9,26 @@ use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
 use crate::notification::{encode_notification_json, Notification, NotificationPayload};
 use crate::private::{decode_json, to_cstring};
-use crate::response::{
-    encode_response_json, NotificationResponse, NotificationResponsePayload,
-};
+use crate::response::{encode_response_json, NotificationResponse, NotificationResponsePayload};
 
 mod private {
     pub trait Sealed {}
 }
 
+/// Wraps the `UNNotificationContentExtensionMediaPlayPauseButtonType` enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u64)]
 pub enum NotificationContentExtensionMediaPlayPauseButtonType {
+    /// Shows no media play/pause button.
     None = 0,
+    /// Shows the default media play/pause button.
     Default = 1,
+    /// Shows the media play/pause button as an overlay.
     Overlay = 2,
 }
 
 impl NotificationContentExtensionMediaPlayPauseButtonType {
+    /// Converts a raw framework value into a media play/pause button type.
     #[must_use]
     pub const fn from_raw(raw: u64) -> Self {
         match raw {
@@ -36,15 +39,20 @@ impl NotificationContentExtensionMediaPlayPauseButtonType {
     }
 }
 
+/// Wraps the `UNNotificationContentExtensionResponseOption` enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u64)]
 pub enum NotificationContentExtensionResponseOption {
+    /// Keeps the notification interface visible.
     DoNotDismiss = 0,
+    /// Dismisses the notification interface.
     Dismiss = 1,
+    /// Dismisses the interface and forwards the action.
     DismissAndForwardAction = 2,
 }
 
 impl NotificationContentExtensionResponseOption {
+    /// Converts a raw framework value into a content-extension response option.
     #[must_use]
     pub const fn from_raw(raw: u64) -> Self {
         match raw {
@@ -55,15 +63,21 @@ impl NotificationContentExtensionResponseOption {
     }
 }
 
+/// Wraps rectangle values used by notification content extension media controls.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct NotificationContentExtensionRect {
+    /// The x.
     pub x: f64,
+    /// The y.
     pub y: f64,
+    /// The width.
     pub width: f64,
+    /// The height.
     pub height: f64,
 }
 
 impl NotificationContentExtensionRect {
+    /// Creates a content-extension rectangle.
     #[must_use]
     pub const fn new(x: f64, y: f64, width: f64, height: f64) -> Self {
         Self {
@@ -75,15 +89,21 @@ impl NotificationContentExtensionRect {
     }
 }
 
+/// Wraps tint-color values used by notification content extension media controls.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct NotificationContentExtensionTintColor {
+    /// The red.
     pub red: f64,
+    /// The green.
     pub green: f64,
+    /// The blue.
     pub blue: f64,
+    /// The alpha.
     pub alpha: f64,
 }
 
 impl NotificationContentExtensionTintColor {
+    /// Creates a content-extension tint color.
     #[must_use]
     pub const fn new(red: f64, green: f64, blue: f64, alpha: f64) -> Self {
         Self {
@@ -95,11 +115,14 @@ impl NotificationContentExtensionTintColor {
     }
 }
 
+/// Wraps the `UNNotificationContentExtension` callback surface.
 pub trait NotificationContentExtensionHandler: Send + private::Sealed {
+    /// Handles a notification delivered to a content extension.
     fn did_receive_notification(&mut self, notification: Notification) {
         let _ = notification;
     }
 
+    /// Handles a user response to a delivered notification.
     fn did_receive_notification_response(
         &mut self,
         response: NotificationResponse,
@@ -108,16 +131,20 @@ pub trait NotificationContentExtensionHandler: Send + private::Sealed {
         NotificationContentExtensionResponseOption::DismissAndForwardAction
     }
 
+    /// Handles media playback starting in a content extension.
     fn media_play(&mut self) {}
 
+    /// Handles media playback pausing in a content extension.
     fn media_pause(&mut self) {}
 }
 
 type NotificationHandler = Box<dyn FnMut(Notification) + Send + 'static>;
-type ResponseHandler =
-    Box<dyn FnMut(NotificationResponse) -> NotificationContentExtensionResponseOption + Send + 'static>;
+type ResponseHandler = Box<
+    dyn FnMut(NotificationResponse) -> NotificationContentExtensionResponseOption + Send + 'static,
+>;
 type SimpleHandler = Box<dyn FnMut() + Send + 'static>;
 
+/// Closure-based builder for a `UNNotificationContentExtension` handler.
 pub struct NotificationContentExtensionCallbacks {
     notification: Option<NotificationHandler>,
     response: Option<ResponseHandler>,
@@ -126,6 +153,7 @@ pub struct NotificationContentExtensionCallbacks {
 }
 
 impl NotificationContentExtensionCallbacks {
+    /// Creates an empty callback-based content-extension handler.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -136,15 +164,14 @@ impl NotificationContentExtensionCallbacks {
         }
     }
 
+    /// Registers a callback for notification.
     #[must_use]
-    pub fn on_notification(
-        mut self,
-        callback: impl FnMut(Notification) + Send + 'static,
-    ) -> Self {
+    pub fn on_notification(mut self, callback: impl FnMut(Notification) + Send + 'static) -> Self {
         self.notification = Some(Box::new(callback));
         self
     }
 
+    /// Registers a callback for response.
     #[must_use]
     pub fn on_response(
         mut self,
@@ -156,12 +183,14 @@ impl NotificationContentExtensionCallbacks {
         self
     }
 
+    /// Registers a callback for media play.
     #[must_use]
     pub fn on_media_play(mut self, callback: impl FnMut() + Send + 'static) -> Self {
         self.media_play = Some(Box::new(callback));
         self
     }
 
+    /// Registers a callback for media pause.
     #[must_use]
     pub fn on_media_pause(mut self, callback: impl FnMut() + Send + 'static) -> Self {
         self.media_pause = Some(Box::new(callback));
@@ -210,16 +239,21 @@ struct CallbackState {
     handler: Mutex<Box<dyn NotificationContentExtensionHandler>>,
 }
 
+/// Wraps `UNNotificationContentExtensionContext`.
 pub struct NotificationContentExtensionContext {
     raw: *mut c_void,
 }
 
+/// Simulates a `UNNotificationContentExtension` host environment.
 pub struct NotificationContentExtensionSimulator {
     raw: *mut c_void,
     _callback_state: Box<CallbackState>,
 }
 
-extern "C" fn content_notification_trampoline(user_info: *mut c_void, notification_json: *const c_char) {
+extern "C" fn content_notification_trampoline(
+    user_info: *mut c_void,
+    notification_json: *const c_char,
+) {
     let _ = catch_unwind(AssertUnwindSafe(|| {
         if user_info.is_null() || notification_json.is_null() {
             return;
@@ -288,9 +322,11 @@ extern "C" fn content_media_pause_trampoline(user_info: *mut c_void) {
 }
 
 impl NotificationContentExtensionContext {
+    /// Creates a notification content extension context.
     pub fn new() -> Result<Self, UserNotificationsError> {
         let mut raw = core::ptr::null_mut();
-        let status = unsafe { ffi::content_extension::un_content_extension_context_create(&mut raw) };
+        let status =
+            unsafe { ffi::content_extension::un_content_extension_context_create(&mut raw) };
         if status == ffi::status::OK {
             Ok(Self { raw })
         } else {
@@ -300,6 +336,7 @@ impl NotificationContentExtensionContext {
         }
     }
 
+    /// Sets the notification actions visible to the content extension.
     pub fn set_notification_actions(
         &self,
         actions: &[NotificationAction],
@@ -329,12 +366,12 @@ impl NotificationContentExtensionContext {
         }
     }
 
+    /// Returns the notification actions visible to the content extension.
     pub fn notification_actions(&self) -> Result<Vec<NotificationAction>, UserNotificationsError> {
         let mut error = core::ptr::null_mut();
         let payload = unsafe {
             ffi::content_extension::un_content_extension_context_get_notification_actions_json(
-                self.raw,
-                &mut error,
+                self.raw, &mut error,
             )
         };
         if payload.is_null() {
@@ -345,20 +382,30 @@ impl NotificationContentExtensionContext {
         }
     }
 
+    /// Performs the default action for the current notification.
     pub fn perform_default_action(&self) {
-        unsafe { ffi::content_extension::un_content_extension_context_perform_default_action(self.raw) };
+        unsafe {
+            ffi::content_extension::un_content_extension_context_perform_default_action(self.raw);
+        };
     }
 
+    /// Dismisses the notification content extension interface.
     pub fn dismiss_notification_content_extension(&self) {
         unsafe { ffi::content_extension::un_content_extension_context_dismiss(self.raw) };
     }
 
+    /// Notifies the host that media playback started.
     pub fn media_playing_started(&self) {
-        unsafe { ffi::content_extension::un_content_extension_context_media_playing_started(self.raw) };
+        unsafe {
+            ffi::content_extension::un_content_extension_context_media_playing_started(self.raw);
+        };
     }
 
+    /// Notifies the host that media playback paused.
     pub fn media_playing_paused(&self) {
-        unsafe { ffi::content_extension::un_content_extension_context_media_playing_paused(self.raw) };
+        unsafe {
+            ffi::content_extension::un_content_extension_context_media_playing_paused(self.raw);
+        };
     }
 }
 
@@ -369,12 +416,14 @@ impl Drop for NotificationContentExtensionContext {
 }
 
 impl NotificationContentExtensionSimulator {
+    /// Creates a notification content extension simulator with callbacks.
     pub fn new(
         callbacks: NotificationContentExtensionCallbacks,
     ) -> Result<Self, UserNotificationsError> {
         Self::with_handler(callbacks)
     }
 
+    /// Creates a notification content extension simulator with a custom handler.
     pub fn with_handler<H>(handler: H) -> Result<Self, UserNotificationsError>
     where
         H: NotificationContentExtensionHandler + 'static,
@@ -382,7 +431,9 @@ impl NotificationContentExtensionSimulator {
         let callback_state = Box::new(CallbackState {
             handler: Mutex::new(Box::new(handler)),
         });
-        let user_info = std::ptr::from_ref::<CallbackState>(&*callback_state).cast_mut().cast();
+        let user_info = std::ptr::from_ref::<CallbackState>(&*callback_state)
+            .cast_mut()
+            .cast();
         let mut raw = core::ptr::null_mut();
         let mut error = core::ptr::null_mut();
         let status = unsafe {
@@ -418,6 +469,7 @@ impl NotificationContentExtensionSimulator {
         }
     }
 
+    /// Sets the simulated media play/pause button type.
     pub fn set_media_play_pause_button_type(
         &self,
         button_type: NotificationContentExtensionMediaPlayPauseButtonType,
@@ -430,8 +482,11 @@ impl NotificationContentExtensionSimulator {
         }
     }
 
+    /// Returns the simulated media play/pause button type.
     #[must_use]
-    pub fn media_play_pause_button_type(&self) -> NotificationContentExtensionMediaPlayPauseButtonType {
+    pub fn media_play_pause_button_type(
+        &self,
+    ) -> NotificationContentExtensionMediaPlayPauseButtonType {
         NotificationContentExtensionMediaPlayPauseButtonType::from_raw(unsafe {
             ffi::content_extension::un_content_extension_simulator_get_media_play_pause_button_type(
                 self.raw,
@@ -439,10 +494,8 @@ impl NotificationContentExtensionSimulator {
         })
     }
 
-    pub fn set_media_play_pause_button_frame(
-        &self,
-        frame: NotificationContentExtensionRect,
-    ) {
+    /// Sets the simulated media play/pause button frame.
+    pub fn set_media_play_pause_button_frame(&self, frame: NotificationContentExtensionRect) {
         unsafe {
             ffi::content_extension::un_content_extension_simulator_set_media_play_pause_button_frame(
                 self.raw,
@@ -454,6 +507,7 @@ impl NotificationContentExtensionSimulator {
         }
     }
 
+    /// Returns the simulated media play/pause button frame.
     #[must_use]
     pub fn media_play_pause_button_frame(&self) -> NotificationContentExtensionRect {
         let mut x = 0.0;
@@ -472,6 +526,7 @@ impl NotificationContentExtensionSimulator {
         NotificationContentExtensionRect::new(x, y, width, height)
     }
 
+    /// Sets the simulated media play/pause button tint color.
     pub fn set_media_play_pause_button_tint_color(
         &self,
         tint_color: NotificationContentExtensionTintColor,
@@ -487,6 +542,7 @@ impl NotificationContentExtensionSimulator {
         }
     }
 
+    /// Returns the simulated media play/pause button tint color.
     #[must_use]
     pub fn media_play_pause_button_tint_color(
         &self,
@@ -507,7 +563,11 @@ impl NotificationContentExtensionSimulator {
         present.then(|| NotificationContentExtensionTintColor::new(red, green, blue, alpha))
     }
 
-    pub fn receive_notification(&self, notification: &Notification) -> Result<(), UserNotificationsError> {
+    /// Sends a notification to the simulated content extension.
+    pub fn receive_notification(
+        &self,
+        notification: &Notification,
+    ) -> Result<(), UserNotificationsError> {
         let notification = encode_notification_json(notification)?;
         let notification = to_cstring(&notification)?;
         let mut error = core::ptr::null_mut();
@@ -525,6 +585,7 @@ impl NotificationContentExtensionSimulator {
         }
     }
 
+    /// Sends a notification response to the simulated content extension.
     pub fn receive_notification_response(
         &self,
         response: &NotificationResponse,
@@ -548,10 +609,12 @@ impl NotificationContentExtensionSimulator {
         }
     }
 
+    /// Invokes the simulated media-play callback.
     pub fn media_play(&self) {
         unsafe { ffi::content_extension::un_content_extension_simulator_media_play(self.raw) };
     }
 
+    /// Invokes the simulated media-pause callback.
     pub fn media_pause(&self) {
         unsafe { ffi::content_extension::un_content_extension_simulator_media_pause(self.raw) };
     }

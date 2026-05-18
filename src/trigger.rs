@@ -7,59 +7,75 @@ use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
 use crate::private::{decode_json, to_cstring};
 
+/// Wraps the date components used by `UNCalendarNotificationTrigger`.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct DateComponents {
+    /// The year.
     pub year: Option<i64>,
+    /// The month.
     pub month: Option<i64>,
+    /// The day.
     pub day: Option<i64>,
+    /// The hour.
     pub hour: Option<i64>,
+    /// The minute.
     pub minute: Option<i64>,
+    /// The second.
     pub second: Option<i64>,
+    /// The weekday.
     pub weekday: Option<i64>,
 }
 
 impl DateComponents {
+    /// Creates empty date components.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets year.
     #[must_use]
     pub fn with_year(mut self, year: i64) -> Self {
         self.year = Some(year);
         self
     }
 
+    /// Sets month.
     #[must_use]
     pub fn with_month(mut self, month: i64) -> Self {
         self.month = Some(month);
         self
     }
 
+    /// Sets day.
     #[must_use]
     pub fn with_day(mut self, day: i64) -> Self {
         self.day = Some(day);
         self
     }
 
+    /// Sets hour.
     #[must_use]
     pub fn with_hour(mut self, hour: i64) -> Self {
         self.hour = Some(hour);
         self
     }
 
+    /// Sets minute.
     #[must_use]
     pub fn with_minute(mut self, minute: i64) -> Self {
         self.minute = Some(minute);
         self
     }
 
+    /// Sets second.
     #[must_use]
     pub fn with_second(mut self, second: i64) -> Self {
         self.second = Some(second);
         self
     }
 
+    /// Sets weekday.
     #[must_use]
     pub fn with_weekday(mut self, weekday: i64) -> Self {
         self.weekday = Some(weekday);
@@ -67,14 +83,19 @@ impl DateComponents {
     }
 }
 
+/// Wraps `UNTimeIntervalNotificationTrigger`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeIntervalTrigger {
+    /// The time interval.
     pub time_interval: f64,
+    /// Whether the trigger repeats.
     pub repeats: bool,
+    /// The next trigger date.
     pub next_trigger_date: Option<SystemTime>,
 }
 
 impl TimeIntervalTrigger {
+    /// Creates a time-interval trigger.
     #[must_use]
     pub fn new(time_interval: f64, repeats: bool) -> Self {
         Self {
@@ -85,14 +106,19 @@ impl TimeIntervalTrigger {
     }
 }
 
+/// Wraps `UNCalendarNotificationTrigger`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CalendarTrigger {
+    /// The date components.
     pub date_components: DateComponents,
+    /// Whether the trigger repeats.
     pub repeats: bool,
+    /// The next trigger date.
     pub next_trigger_date: Option<SystemTime>,
 }
 
 impl CalendarTrigger {
+    /// Creates a calendar trigger.
     #[must_use]
     pub fn new(date_components: DateComponents, repeats: bool) -> Self {
         Self {
@@ -103,35 +129,50 @@ impl CalendarTrigger {
     }
 }
 
+/// Wraps `UNNotificationTrigger` and its concrete subclasses.
 #[derive(Debug, Clone, PartialEq)]
 pub enum NotificationTrigger {
+    /// Represents a `UNTimeIntervalNotificationTrigger`.
     TimeInterval(TimeIntervalTrigger),
+    /// Represents a `UNCalendarNotificationTrigger`.
     Calendar(CalendarTrigger),
+    /// Represents a push notification trigger.
     Push,
-    Unknown { class_name: String, repeats: bool },
+    /// Represents an unmodeled `UNNotificationTrigger` subclass.
+    Unknown {
+        /// The runtime Objective-C class name.
+        class_name: String,
+        /// Whether the trigger repeats.
+        repeats: bool,
+    },
 }
 
 impl NotificationTrigger {
+    /// Creates a time-interval notification trigger.
     #[must_use]
     pub fn time_interval(seconds: f64, repeats: bool) -> Self {
         Self::TimeInterval(TimeIntervalTrigger::new(seconds, repeats))
     }
 
+    /// Creates a calendar notification trigger.
     #[must_use]
     pub fn calendar(date_components: DateComponents, repeats: bool) -> Self {
         Self::Calendar(CalendarTrigger::new(date_components, repeats))
     }
 
+    /// Creates a push notification trigger marker.
     #[must_use]
     pub const fn push() -> Self {
         Self::Push
     }
 
+    /// Round-trips this trigger through the Swift bridge.
     pub fn bridge_roundtrip(&self) -> Result<Self, UserNotificationsError> {
         let trigger = encode_trigger_json(self)?;
         let trigger = to_cstring(&trigger)?;
         let mut error = core::ptr::null_mut();
-        let payload = unsafe { ffi::trigger::un_trigger_roundtrip_json(trigger.as_ptr(), &mut error) };
+        let payload =
+            unsafe { ffi::trigger::un_trigger_roundtrip_json(trigger.as_ptr(), &mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
@@ -158,7 +199,9 @@ impl From<&NotificationTrigger> for NotificationTriggerPayload {
                 repeats: Some(trigger.repeats),
                 time_interval: Some(trigger.time_interval),
                 date_components: None,
-                next_trigger_date: timestamp_from_system_time_opt(trigger.next_trigger_date.as_ref()),
+                next_trigger_date: timestamp_from_system_time_opt(
+                    trigger.next_trigger_date.as_ref(),
+                ),
                 class_name: None,
             },
             NotificationTrigger::Calendar(trigger) => Self {
@@ -166,7 +209,9 @@ impl From<&NotificationTrigger> for NotificationTriggerPayload {
                 repeats: Some(trigger.repeats),
                 time_interval: None,
                 date_components: Some(trigger.date_components.clone()),
-                next_trigger_date: timestamp_from_system_time_opt(trigger.next_trigger_date.as_ref()),
+                next_trigger_date: timestamp_from_system_time_opt(
+                    trigger.next_trigger_date.as_ref(),
+                ),
                 class_name: None,
             },
             NotificationTrigger::Push => Self {

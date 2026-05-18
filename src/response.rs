@@ -12,27 +12,39 @@ use crate::private::decode_json;
 raw_option_set!(NotificationPresentationOptions);
 
 impl NotificationPresentationOptions {
+    /// No flags.
     pub const NONE: Self = Self(0);
+    /// The badge flag.
     pub const BADGE: Self = Self(1 << 0);
+    /// The sound flag.
     pub const SOUND: Self = Self(1 << 1);
+    /// The alert flag.
     pub const ALERT: Self = Self(1 << 2);
+    /// The list flag.
     pub const LIST: Self = Self(1 << 3);
+    /// The banner flag.
     pub const BANNER: Self = Self(1 << 4);
 }
 
+/// Wraps `UNNotificationResponse` and `UNTextInputNotificationResponse`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NotificationResponse {
+    /// The action identifier.
     pub action_identifier: String,
+    /// The notification.
     pub notification: Notification,
+    /// The user text.
     pub user_text: Option<String>,
 }
 
 impl NotificationResponse {
+    /// Returns whether this response uses the default action identifier.
     #[must_use]
     pub fn is_default_action(&self) -> bool {
         self.action_identifier == default_action_identifier()
     }
 
+    /// Returns whether this response uses the dismiss action identifier.
     #[must_use]
     pub fn is_dismiss_action(&self) -> bool {
         self.action_identifier == dismiss_action_identifier()
@@ -83,6 +95,7 @@ pub(crate) fn decode_response_json(
     decode_json::<NotificationResponsePayload>(ptr).map(Into::into)
 }
 
+/// Returns `UNNotificationDefaultActionIdentifier`.
 #[must_use]
 pub fn default_action_identifier() -> &'static str {
     static DEFAULT_ACTION_IDENTIFIER: OnceLock<String> = OnceLock::new();
@@ -93,6 +106,7 @@ pub fn default_action_identifier() -> &'static str {
         .as_str()
 }
 
+/// Returns `UNNotificationDismissActionIdentifier`.
 #[must_use]
 pub fn dismiss_action_identifier() -> &'static str {
     static DISMISS_ACTION_IDENTIFIER: OnceLock<String> = OnceLock::new();

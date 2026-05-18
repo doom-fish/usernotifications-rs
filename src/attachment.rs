@@ -7,23 +7,33 @@ use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
 use crate::private::{decode_json, to_cstring};
 
+/// Matches `UNNotificationAttachmentOptionsTypeHintKey`.
 pub const ATTACHMENT_OPTIONS_TYPE_HINT_KEY: &str = "UNNotificationAttachmentOptionsTypeHintKey";
+/// Matches `UNNotificationAttachmentOptionsThumbnailHiddenKey`.
 pub const ATTACHMENT_OPTIONS_THUMBNAIL_HIDDEN_KEY: &str =
     "UNNotificationAttachmentOptionsThumbnailHiddenKey";
+/// Matches `UNNotificationAttachmentOptionsThumbnailClippingRectKey`.
 pub const ATTACHMENT_OPTIONS_THUMBNAIL_CLIPPING_RECT_KEY: &str =
     "UNNotificationAttachmentOptionsThumbnailClippingRectKey";
+/// Matches `UNNotificationAttachmentOptionsThumbnailTimeKey`.
 pub const ATTACHMENT_OPTIONS_THUMBNAIL_TIME_KEY: &str =
     "UNNotificationAttachmentOptionsThumbnailTimeKey";
 
+/// Wraps the clipping rectangle used by `UNNotificationAttachment` thumbnail options.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AttachmentThumbnailClippingRect {
+    /// The x.
     pub x: f64,
+    /// The y.
     pub y: f64,
+    /// The width.
     pub width: f64,
+    /// The height.
     pub height: f64,
 }
 
 impl AttachmentThumbnailClippingRect {
+    /// Creates a new attachment thumbnail clipping rect.
     #[must_use]
     pub const fn new(x: f64, y: f64, width: f64, height: f64) -> Self {
         Self {
@@ -35,38 +45,50 @@ impl AttachmentThumbnailClippingRect {
     }
 }
 
+/// Wraps the thumbnail time value used by `UNNotificationAttachment` options.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AttachmentThumbnailTime {
+    /// Uses a time offset in seconds.
     Seconds(f64),
+    /// Uses a frame index.
     Frame(u64),
 }
 
+/// Wraps the option dictionary used to create `UNNotificationAttachment` values.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NotificationAttachmentOptions {
+    /// The type hint.
     pub type_hint: Option<String>,
+    /// Whether the attachment thumbnail is hidden.
     pub thumbnail_hidden: bool,
+    /// The thumbnail clipping rect.
     pub thumbnail_clipping_rect: Option<AttachmentThumbnailClippingRect>,
+    /// The thumbnail time.
     pub thumbnail_time: Option<AttachmentThumbnailTime>,
 }
 
 impl NotificationAttachmentOptions {
+    /// Creates default notification attachment options.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets type hint.
     #[must_use]
     pub fn with_type_hint(mut self, type_hint: impl Into<String>) -> Self {
         self.type_hint = Some(type_hint.into());
         self
     }
 
+    /// Sets thumbnail hidden.
     #[must_use]
     pub fn with_thumbnail_hidden(mut self, thumbnail_hidden: bool) -> Self {
         self.thumbnail_hidden = thumbnail_hidden;
         self
     }
 
+    /// Sets thumbnail clipping rect.
     #[must_use]
     pub fn with_thumbnail_clipping_rect(
         mut self,
@@ -76,6 +98,7 @@ impl NotificationAttachmentOptions {
         self
     }
 
+    /// Sets thumbnail time.
     #[must_use]
     pub fn with_thumbnail_time(mut self, thumbnail_time: AttachmentThumbnailTime) -> Self {
         self.thumbnail_time = Some(thumbnail_time);
@@ -83,15 +106,21 @@ impl NotificationAttachmentOptions {
     }
 }
 
+/// Wraps `UNNotificationAttachment`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NotificationAttachment {
+    /// The identifier.
     pub identifier: String,
+    /// The file path.
     pub file_path: PathBuf,
+    /// The attachment type.
     pub attachment_type: Option<String>,
+    /// The options.
     pub options: NotificationAttachmentOptions,
 }
 
 impl NotificationAttachment {
+    /// Creates a notification attachment from a file path.
     pub fn from_file(
         identifier: impl Into<String>,
         file_path: impl AsRef<Path>,
@@ -99,6 +128,7 @@ impl NotificationAttachment {
         Self::from_file_with_options(identifier, file_path, NotificationAttachmentOptions::new())
     }
 
+    /// Creates a notification attachment from a file path and options.
     pub fn from_file_with_options(
         identifier: impl Into<String>,
         file_path: impl AsRef<Path>,
@@ -113,16 +143,20 @@ impl NotificationAttachment {
         attachment.bridge_roundtrip()
     }
 
+    /// Returns the attachment file path.
     #[must_use]
     pub fn file_path(&self) -> &Path {
         &self.file_path
     }
 
+    /// Round-trips this value through the Swift bridge.
     pub fn bridge_roundtrip(&self) -> Result<Self, UserNotificationsError> {
         let attachment = encode_attachment_json(self)?;
         let attachment = to_cstring(&attachment)?;
         let mut error = core::ptr::null_mut();
-        let payload = unsafe { ffi::attachment::un_attachment_roundtrip_json(attachment.as_ptr(), &mut error) };
+        let payload = unsafe {
+            ffi::attachment::un_attachment_roundtrip_json(attachment.as_ptr(), &mut error)
+        };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
@@ -202,7 +236,10 @@ impl From<&NotificationAttachmentOptions> for NotificationAttachmentOptionsPaylo
                 .thumbnail_clipping_rect
                 .as_ref()
                 .map(AttachmentThumbnailClippingRectPayload::from),
-            thumbnail_time: value.thumbnail_time.as_ref().map(AttachmentThumbnailTimePayload::from),
+            thumbnail_time: value
+                .thumbnail_time
+                .as_ref()
+                .map(AttachmentThumbnailTimePayload::from),
         }
     }
 }

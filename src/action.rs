@@ -11,33 +11,52 @@ use crate::private::{decode_json, to_cstring};
 raw_option_set!(NotificationActionOptions);
 
 impl NotificationActionOptions {
+    /// No flags.
     pub const NONE: Self = Self(0);
+    /// The authentication required flag.
     pub const AUTHENTICATION_REQUIRED: Self = Self(1 << 0);
+    /// The destructive flag.
     pub const DESTRUCTIVE: Self = Self(1 << 1);
+    /// The foreground flag.
     pub const FOREGROUND: Self = Self(1 << 2);
 }
 
+/// Wraps icon metadata used by `UNNotificationActionIcon`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NotificationActionIcon {
+    /// Uses a template image name for the action icon.
     TemplateImage(String),
+    /// Uses a system image name for the action icon.
     SystemImage(String),
+    /// Fallback for icon values the framework returns but this crate does not model yet.
     Unknown,
 }
 
+/// Wraps `UNNotificationAction` and `UNTextInputNotificationAction`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NotificationAction {
+    /// The identifier.
     pub identifier: String,
+    /// The title.
     pub title: String,
+    /// The options.
     pub options: NotificationActionOptions,
+    /// The icon.
     pub icon: Option<NotificationActionIcon>,
+    /// The text input button title.
     pub text_input_button_title: Option<String>,
+    /// The text input placeholder.
     pub text_input_placeholder: Option<String>,
+    /// The localized title.
     pub localized_title: Option<LocalizedNotificationString>,
+    /// The localized text input button title.
     pub localized_text_input_button_title: Option<LocalizedNotificationString>,
+    /// The localized text input placeholder.
     pub localized_text_input_placeholder: Option<LocalizedNotificationString>,
 }
 
 impl NotificationAction {
+    /// Creates a new notification action.
     #[must_use]
     pub fn new(
         identifier: impl Into<String>,
@@ -57,6 +76,7 @@ impl NotificationAction {
         }
     }
 
+    /// Creates a new text-input notification action.
     #[must_use]
     pub fn new_text_input(
         identifier: impl Into<String>,
@@ -78,18 +98,21 @@ impl NotificationAction {
         }
     }
 
+    /// Sets icon.
     #[must_use]
     pub fn with_icon(mut self, icon: NotificationActionIcon) -> Self {
         self.icon = Some(icon);
         self
     }
 
+    /// Sets localized title.
     #[must_use]
     pub fn with_localized_title(mut self, localized_title: LocalizedNotificationString) -> Self {
         self.localized_title = Some(localized_title);
         self
     }
 
+    /// Sets localized text input button title.
     #[must_use]
     pub fn with_localized_text_input_button_title(
         mut self,
@@ -99,6 +122,7 @@ impl NotificationAction {
         self
     }
 
+    /// Sets localized text input placeholder.
     #[must_use]
     pub fn with_localized_text_input_placeholder(
         mut self,
@@ -108,6 +132,7 @@ impl NotificationAction {
         self
     }
 
+    /// Round-trips this value through the Swift bridge.
     pub fn bridge_roundtrip(&self) -> Result<Self, UserNotificationsError> {
         let action = encode_action_json(self)?;
         let action = to_cstring(&action)?;

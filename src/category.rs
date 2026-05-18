@@ -12,25 +12,39 @@ use crate::private::{decode_json, to_cstring};
 raw_option_set!(NotificationCategoryOptions);
 
 impl NotificationCategoryOptions {
+    /// No flags.
     pub const NONE: Self = Self(0);
+    /// The custom dismiss action flag.
     pub const CUSTOM_DISMISS_ACTION: Self = Self(1 << 0);
+    /// The hidden previews show title flag.
     pub const HIDDEN_PREVIEWS_SHOW_TITLE: Self = Self(1 << 2);
+    /// The hidden previews show subtitle flag.
     pub const HIDDEN_PREVIEWS_SHOW_SUBTITLE: Self = Self(1 << 3);
 }
 
+/// Wraps `UNNotificationCategory`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NotificationCategory {
+    /// The identifier.
     pub identifier: String,
+    /// The actions.
     pub actions: Vec<NotificationAction>,
+    /// The intent identifiers.
     pub intent_identifiers: Vec<String>,
+    /// The options.
     pub options: NotificationCategoryOptions,
+    /// The hidden previews body placeholder.
     pub hidden_previews_body_placeholder: Option<String>,
+    /// The category summary format.
     pub category_summary_format: Option<String>,
+    /// The localized hidden previews body placeholder.
     pub localized_hidden_previews_body_placeholder: Option<LocalizedNotificationString>,
+    /// The localized category summary format.
     pub localized_category_summary_format: Option<LocalizedNotificationString>,
 }
 
 impl NotificationCategory {
+    /// Creates a new notification category.
     #[must_use]
     pub fn new(
         identifier: impl Into<String>,
@@ -50,6 +64,7 @@ impl NotificationCategory {
         }
     }
 
+    /// Sets hidden previews body placeholder.
     #[must_use]
     pub fn with_hidden_previews_body_placeholder(
         mut self,
@@ -59,6 +74,7 @@ impl NotificationCategory {
         self
     }
 
+    /// Sets category summary format.
     #[must_use]
     pub fn with_category_summary_format(
         mut self,
@@ -68,6 +84,7 @@ impl NotificationCategory {
         self
     }
 
+    /// Sets localized hidden previews body placeholder.
     #[must_use]
     pub fn with_localized_hidden_previews_body_placeholder(
         mut self,
@@ -78,6 +95,7 @@ impl NotificationCategory {
         self
     }
 
+    /// Sets localized category summary format.
     #[must_use]
     pub fn with_localized_category_summary_format(
         mut self,
@@ -87,11 +105,13 @@ impl NotificationCategory {
         self
     }
 
+    /// Round-trips this value through the Swift bridge.
     pub fn bridge_roundtrip(&self) -> Result<Self, UserNotificationsError> {
         let category = encode_category_json(self)?;
         let category = to_cstring(&category)?;
         let mut error = core::ptr::null_mut();
-        let payload = unsafe { ffi::category::un_category_roundtrip_json(category.as_ptr(), &mut error) };
+        let payload =
+            unsafe { ffi::category::un_category_roundtrip_json(category.as_ptr(), &mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
@@ -116,7 +136,11 @@ impl From<&NotificationCategory> for NotificationCategoryPayload {
     fn from(value: &NotificationCategory) -> Self {
         Self {
             identifier: value.identifier.clone(),
-            actions: value.actions.iter().map(NotificationActionPayload::from).collect(),
+            actions: value
+                .actions
+                .iter()
+                .map(NotificationActionPayload::from)
+                .collect(),
             intent_identifiers: value.intent_identifiers.clone(),
             options: value.options.bits(),
             hidden_previews_body_placeholder: value.hidden_previews_body_placeholder.clone(),

@@ -8,14 +8,19 @@ use crate::ffi;
 use crate::private::{decode_json, to_cstring};
 use crate::trigger::{NotificationTrigger, NotificationTriggerPayload};
 
+/// Wraps `UNNotificationRequest`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NotificationRequest {
+    /// The identifier.
     pub identifier: String,
+    /// The content.
     pub content: NotificationContent,
+    /// The trigger.
     pub trigger: Option<NotificationTrigger>,
 }
 
 impl NotificationRequest {
+    /// Creates a new notification request.
     #[must_use]
     pub fn new(
         identifier: impl Into<String>,
@@ -29,11 +34,13 @@ impl NotificationRequest {
         }
     }
 
+    /// Round-trips this value through the Swift bridge.
     pub fn bridge_roundtrip(&self) -> Result<Self, UserNotificationsError> {
         let request = encode_request_json(self)?;
         let request = to_cstring(&request)?;
         let mut error = core::ptr::null_mut();
-        let payload = unsafe { ffi::request::un_request_roundtrip_json(request.as_ptr(), &mut error) };
+        let payload =
+            unsafe { ffi::request::un_request_roundtrip_json(request.as_ptr(), &mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {

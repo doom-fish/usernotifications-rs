@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.3.4] - 2026-05-18
+
+- Added rustdoc coverage across the public UserNotifications wrappers, lifting crate docs from 2.2% to full public-item coverage.
+
 ## [0.3.3] - 2026-05-18
 
 - Widen doom-fish-utils version bound to `<0.3` so 0.2.x resolves.

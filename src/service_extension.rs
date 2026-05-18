@@ -14,7 +14,9 @@ mod private {
     pub trait Sealed {}
 }
 
+/// Wraps the `UNNotificationServiceExtension` callback surface.
 pub trait NotificationServiceExtensionHandler: Send + private::Sealed {
+    /// Handles an incoming request before a service extension delivers modified content.
     fn did_receive_notification_request(
         &mut self,
         request: NotificationRequest,
@@ -22,18 +24,21 @@ pub trait NotificationServiceExtensionHandler: Send + private::Sealed {
         request.content
     }
 
+    /// Handles the service-extension expiration callback.
     fn service_extension_time_will_expire(&mut self) {}
 }
 
 type ReceiveHandler = Box<dyn FnMut(NotificationRequest) -> NotificationContent + Send + 'static>;
 type ExpireHandler = Box<dyn FnMut() + Send + 'static>;
 
+/// Closure-based builder for a `UNNotificationServiceExtension` handler.
 pub struct NotificationServiceExtensionCallbacks {
     receive: Option<ReceiveHandler>,
     expire: Option<ExpireHandler>,
 }
 
 impl NotificationServiceExtensionCallbacks {
+    /// Creates an empty callback-based service-extension handler.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -42,6 +47,7 @@ impl NotificationServiceExtensionCallbacks {
         }
     }
 
+    /// Registers a callback for receive notification request.
     #[must_use]
     pub fn on_receive_notification_request(
         mut self,
@@ -51,6 +57,7 @@ impl NotificationServiceExtensionCallbacks {
         self
     }
 
+    /// Registers a callback for time will expire.
     #[must_use]
     pub fn on_time_will_expire(mut self, callback: impl FnMut() + Send + 'static) -> Self {
         self.expire = Some(Box::new(callback));
@@ -88,6 +95,7 @@ struct CallbackState {
     handler: Mutex<Box<dyn NotificationServiceExtensionHandler>>,
 }
 
+/// Simulates a `UNNotificationServiceExtension` host environment.
 pub struct NotificationServiceExtensionSimulator {
     raw: *mut c_void,
     _callback_state: Box<CallbackState>,
@@ -109,7 +117,10 @@ extern "C" fn service_receive_trampoline(
         let request = match serde_json::from_str::<NotificationRequestPayload>(&json) {
             Ok(payload) => NotificationRequest::from(payload),
             Err(error) => {
-                write_error(error_out, &format!("failed to decode notification request payload: {error}"));
+                write_error(
+                    error_out,
+                    &format!("failed to decode notification request payload: {error}"),
+                );
                 return core::ptr::null_mut();
             }
         };
@@ -147,12 +158,14 @@ extern "C" fn service_expire_trampoline(user_info: *mut c_void) {
 }
 
 impl NotificationServiceExtensionSimulator {
+    /// Creates a notification service extension simulator with callbacks.
     pub fn new(
         callbacks: NotificationServiceExtensionCallbacks,
     ) -> Result<Self, UserNotificationsError> {
         Self::with_handler(callbacks)
     }
 
+    /// Creates a notification service extension simulator with a custom handler.
     pub fn with_handler<H>(handler: H) -> Result<Self, UserNotificationsError>
     where
         H: NotificationServiceExtensionHandler + 'static,
@@ -160,7 +173,9 @@ impl NotificationServiceExtensionSimulator {
         let callback_state = Box::new(CallbackState {
             handler: Mutex::new(Box::new(handler)),
         });
-        let user_info = std::ptr::from_ref::<CallbackState>(&*callback_state).cast_mut().cast();
+        let user_info = std::ptr::from_ref::<CallbackState>(&*callback_state)
+            .cast_mut()
+            .cast();
         let mut raw = core::ptr::null_mut();
         let mut error = core::ptr::null_mut();
         let status = unsafe {
@@ -188,6 +203,7 @@ impl NotificationServiceExtensionSimulator {
         }
     }
 
+    /// Sends a request to the simulated service extension.
     pub fn receive_notification_request(
         &self,
         request: &NotificationRequest,
@@ -209,8 +225,11 @@ impl NotificationServiceExtensionSimulator {
         }
     }
 
+    /// Invokes the simulated expiration callback.
     pub fn service_extension_time_will_expire(&self) {
-        unsafe { ffi::service_extension::un_service_extension_simulator_time_will_expire(self.raw) };
+        unsafe {
+            ffi::service_extension::un_service_extension_simulator_time_will_expire(self.raw);
+        };
     }
 }
 

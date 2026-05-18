@@ -12,13 +12,17 @@ mod content_provider_private {
     pub trait Sealed {}
 }
 
+/// Wraps localized string inputs consumed by `UNMutableNotificationContent` text properties.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LocalizedNotificationString {
+    /// The key.
     pub key: String,
+    /// The arguments.
     pub arguments: Vec<Value>,
 }
 
 impl LocalizedNotificationString {
+    /// Creates a localized notification string.
     #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
         Self {
@@ -27,6 +31,7 @@ impl LocalizedNotificationString {
         }
     }
 
+    /// Adds a localization argument.
     #[must_use]
     pub fn with_argument(mut self, argument: impl Into<Value>) -> Self {
         self.arguments.push(argument.into());
@@ -34,16 +39,22 @@ impl LocalizedNotificationString {
     }
 }
 
+/// Wraps the `UNNotificationInterruptionLevel` enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum NotificationInterruptionLevel {
+    /// Delivers the notification passively.
     Passive = 0,
+    /// Delivers the notification with the default active behavior.
     Active = 1,
+    /// Marks the notification as time sensitive.
     TimeSensitive = 2,
+    /// Marks the notification as critical.
     Critical = 3,
 }
 
 impl NotificationInterruptionLevel {
+    /// Converts a raw framework value into an interruption level.
     #[must_use]
     pub const fn from_raw(raw: i32) -> Self {
         match raw {
@@ -55,25 +66,42 @@ impl NotificationInterruptionLevel {
     }
 }
 
+/// Wraps `UNNotificationSound`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum NotificationSound {
+    /// Uses the default notification sound.
     Default,
+    /// Uses the default critical notification sound.
     DefaultCritical,
+    /// Uses the default critical notification sound with an explicit volume.
     DefaultCriticalWithVolume(f32),
+    /// Uses a custom sound resource name.
     Named(String),
-    CriticalNamed { name: String, volume: Option<f32> },
+    /// Uses a named critical sound.
+    CriticalNamed {
+        /// The custom sound file name.
+        name: String,
+        /// The optional playback volume.
+        volume: Option<f32>,
+    },
+    /// Fallback for sound values the framework returns but this crate does not model yet.
     Unknown,
 }
 
+/// Wraps the handle-type values used by `UNNotificationAttributedMessageContext`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(i32)]
 pub enum NotificationMessagePersonHandleType {
+    /// Represents an unknown handle type.
     Unknown = 0,
+    /// Uses an email-address handle.
     EmailAddress = 1,
+    /// Uses a phone-number handle.
     PhoneNumber = 2,
 }
 
 impl NotificationMessagePersonHandleType {
+    /// Converts a raw framework value into a person-handle type.
     #[must_use]
     pub const fn from_raw(raw: i32) -> Self {
         match raw {
@@ -84,15 +112,20 @@ impl NotificationMessagePersonHandleType {
     }
 }
 
+/// Wraps the outgoing message type used by `UNNotificationAttributedMessageContext`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(i32)]
 pub enum NotificationMessageType {
+    /// Represents an unknown outgoing message type.
     Unknown = 0,
+    /// Represents a text message.
     Text = 1,
+    /// Represents an audio message.
     Audio = 2,
 }
 
 impl NotificationMessageType {
+    /// Converts a raw framework value into a message type.
     #[must_use]
     pub const fn from_raw(raw: i32) -> Self {
         match raw {
@@ -103,17 +136,25 @@ impl NotificationMessageType {
     }
 }
 
+/// Wraps a person record used with `UNNotificationAttributedMessageContext`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NotificationMessagePerson {
+    /// The handle.
     pub handle: String,
+    /// The handle type.
     pub handle_type: NotificationMessagePersonHandleType,
+    /// The display name.
     pub display_name: Option<String>,
+    /// The contact identifier.
     pub contact_identifier: Option<String>,
+    /// The custom identifier.
     pub custom_identifier: Option<String>,
+    /// Whether this person represents the current user.
     pub is_me: bool,
 }
 
 impl NotificationMessagePerson {
+    /// Creates a notification message person.
     #[must_use]
     pub fn new(
         handle: impl Into<String>,
@@ -129,24 +170,28 @@ impl NotificationMessagePerson {
         }
     }
 
+    /// Sets display name.
     #[must_use]
     pub fn with_display_name(mut self, display_name: impl Into<String>) -> Self {
         self.display_name = Some(display_name.into());
         self
     }
 
+    /// Sets contact identifier.
     #[must_use]
     pub fn with_contact_identifier(mut self, contact_identifier: impl Into<String>) -> Self {
         self.contact_identifier = Some(contact_identifier.into());
         self
     }
 
+    /// Sets custom identifier.
     #[must_use]
     pub fn with_custom_identifier(mut self, custom_identifier: impl Into<String>) -> Self {
         self.custom_identifier = Some(custom_identifier.into());
         self
     }
 
+    /// Sets whether this person represents the current user.
     #[must_use]
     pub const fn with_is_me(mut self, is_me: bool) -> Self {
         self.is_me = is_me;
@@ -154,19 +199,29 @@ impl NotificationMessagePerson {
     }
 }
 
+/// Wraps `UNNotificationAttributedMessageContext`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NotificationAttributedMessageContext {
+    /// The sender.
     pub sender: Option<NotificationMessagePerson>,
+    /// The recipients.
     pub recipients: Vec<NotificationMessagePerson>,
+    /// The attributed content.
     pub attributed_content: String,
+    /// The content.
     pub content: Option<String>,
+    /// The outgoing message type.
     pub outgoing_message_type: NotificationMessageType,
+    /// The conversation identifier.
     pub conversation_identifier: Option<String>,
+    /// The service name.
     pub service_name: Option<String>,
+    /// The group name.
     pub group_name: Option<String>,
 }
 
 impl NotificationAttributedMessageContext {
+    /// Creates a notification attributed message context.
     #[must_use]
     pub fn new(attributed_content: impl Into<String>) -> Self {
         Self {
@@ -181,30 +236,35 @@ impl NotificationAttributedMessageContext {
         }
     }
 
+    /// Sets sender.
     #[must_use]
     pub fn with_sender(mut self, sender: NotificationMessagePerson) -> Self {
         self.sender = Some(sender);
         self
     }
 
+    /// Sets recipient.
     #[must_use]
     pub fn with_recipient(mut self, recipient: NotificationMessagePerson) -> Self {
         self.recipients.push(recipient);
         self
     }
 
+    /// Sets recipients.
     #[must_use]
     pub fn with_recipients(mut self, recipients: Vec<NotificationMessagePerson>) -> Self {
         self.recipients = recipients;
         self
     }
 
+    /// Sets content.
     #[must_use]
     pub fn with_content(mut self, content: impl Into<String>) -> Self {
         self.content = Some(content.into());
         self
     }
 
+    /// Sets outgoing message type.
     #[must_use]
     pub const fn with_outgoing_message_type(
         mut self,
@@ -214,6 +274,7 @@ impl NotificationAttributedMessageContext {
         self
     }
 
+    /// Sets conversation identifier.
     #[must_use]
     pub fn with_conversation_identifier(
         mut self,
@@ -223,12 +284,14 @@ impl NotificationAttributedMessageContext {
         self
     }
 
+    /// Sets service name.
     #[must_use]
     pub fn with_service_name(mut self, service_name: impl Into<String>) -> Self {
         self.service_name = Some(service_name.into());
         self
     }
 
+    /// Sets group name.
     #[must_use]
     pub fn with_group_name(mut self, group_name: impl Into<String>) -> Self {
         self.group_name = Some(group_name.into());
@@ -236,6 +299,7 @@ impl NotificationAttributedMessageContext {
     }
 }
 
+/// Sealed trait for values accepted by `UNMutableNotificationContent::updating(from:)`.
 pub trait NotificationContentProviding: content_provider_private::Sealed {
     #[doc(hidden)]
     fn encode_provider_json(&self) -> Result<String, UserNotificationsError>;
@@ -249,29 +313,49 @@ impl NotificationContentProviding for NotificationAttributedMessageContext {
     }
 }
 
+/// Wraps `UNMutableNotificationContent` and decoded `UNNotificationContent` values.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NotificationContent {
+    /// The title.
     pub title: String,
+    /// The subtitle.
     pub subtitle: String,
+    /// The body.
     pub body: String,
+    /// The badge.
     pub badge: Option<i64>,
+    /// The category identifier.
     pub category_identifier: String,
+    /// The thread identifier.
     pub thread_identifier: String,
+    /// The user info.
     pub user_info: Option<Value>,
+    /// The sound.
     pub sound: Option<NotificationSound>,
+    /// The attachments.
     pub attachments: Vec<NotificationAttachment>,
+    /// The summary argument.
     pub summary_argument: String,
+    /// The summary argument count.
     pub summary_argument_count: u64,
+    /// The interruption level.
     pub interruption_level: Option<NotificationInterruptionLevel>,
+    /// The relevance score.
     pub relevance_score: Option<f64>,
+    /// The filter criteria.
     pub filter_criteria: Option<String>,
+    /// The localized title.
     pub localized_title: Option<LocalizedNotificationString>,
+    /// The localized subtitle.
     pub localized_subtitle: Option<LocalizedNotificationString>,
+    /// The localized body.
     pub localized_body: Option<LocalizedNotificationString>,
+    /// The localized summary argument.
     pub localized_summary_argument: Option<LocalizedNotificationString>,
 }
 
 impl NotificationContent {
+    /// Creates mutable notification content with a title and body.
     #[must_use]
     pub fn new(title: impl Into<String>, body: impl Into<String>) -> Self {
         Self {
@@ -282,66 +366,77 @@ impl NotificationContent {
         }
     }
 
+    /// Sets subtitle.
     #[must_use]
     pub fn with_subtitle(mut self, subtitle: impl Into<String>) -> Self {
         self.subtitle = subtitle.into();
         self
     }
 
+    /// Sets badge.
     #[must_use]
     pub fn with_badge(mut self, badge: i64) -> Self {
         self.badge = Some(badge);
         self
     }
 
+    /// Sets category identifier.
     #[must_use]
     pub fn with_category_identifier(mut self, category_identifier: impl Into<String>) -> Self {
         self.category_identifier = category_identifier.into();
         self
     }
 
+    /// Sets thread identifier.
     #[must_use]
     pub fn with_thread_identifier(mut self, thread_identifier: impl Into<String>) -> Self {
         self.thread_identifier = thread_identifier.into();
         self
     }
 
+    /// Sets user info.
     #[must_use]
     pub fn with_user_info(mut self, user_info: Value) -> Self {
         self.user_info = Some(user_info);
         self
     }
 
+    /// Sets sound.
     #[must_use]
     pub fn with_sound(mut self, sound: NotificationSound) -> Self {
         self.sound = Some(sound);
         self
     }
 
+    /// Sets attachment.
     #[must_use]
     pub fn with_attachment(mut self, attachment: NotificationAttachment) -> Self {
         self.attachments.push(attachment);
         self
     }
 
+    /// Sets attachments.
     #[must_use]
     pub fn with_attachments(mut self, attachments: Vec<NotificationAttachment>) -> Self {
         self.attachments = attachments;
         self
     }
 
+    /// Sets summary argument.
     #[must_use]
     pub fn with_summary_argument(mut self, summary_argument: impl Into<String>) -> Self {
         self.summary_argument = summary_argument.into();
         self
     }
 
+    /// Sets summary argument count.
     #[must_use]
     pub fn with_summary_argument_count(mut self, summary_argument_count: u64) -> Self {
         self.summary_argument_count = summary_argument_count;
         self
     }
 
+    /// Sets interruption level.
     #[must_use]
     pub fn with_interruption_level(
         mut self,
@@ -351,24 +446,28 @@ impl NotificationContent {
         self
     }
 
+    /// Sets relevance score.
     #[must_use]
     pub fn with_relevance_score(mut self, relevance_score: f64) -> Self {
         self.relevance_score = Some(relevance_score);
         self
     }
 
+    /// Sets filter criteria.
     #[must_use]
     pub fn with_filter_criteria(mut self, filter_criteria: impl Into<String>) -> Self {
         self.filter_criteria = Some(filter_criteria.into());
         self
     }
 
+    /// Sets localized title.
     #[must_use]
     pub fn with_localized_title(mut self, localized_title: LocalizedNotificationString) -> Self {
         self.localized_title = Some(localized_title);
         self
     }
 
+    /// Sets localized subtitle.
     #[must_use]
     pub fn with_localized_subtitle(
         mut self,
@@ -378,12 +477,14 @@ impl NotificationContent {
         self
     }
 
+    /// Sets localized body.
     #[must_use]
     pub fn with_localized_body(mut self, localized_body: LocalizedNotificationString) -> Self {
         self.localized_body = Some(localized_body);
         self
     }
 
+    /// Sets localized summary argument.
     #[must_use]
     pub fn with_localized_summary_argument(
         mut self,
@@ -393,6 +494,7 @@ impl NotificationContent {
         self
     }
 
+    /// Round-trips this content through the Swift bridge.
     pub fn bridge_roundtrip(&self) -> Result<Self, UserNotificationsError> {
         let content = encode_content_json(self)?;
         let content = to_cstring(&content)?;
@@ -406,6 +508,7 @@ impl NotificationContent {
         }
     }
 
+    /// Applies a content provider using `UNMutableNotificationContent::updating(from:)`.
     pub fn updating_from<P: NotificationContentProviding>(
         &self,
         provider: &P,

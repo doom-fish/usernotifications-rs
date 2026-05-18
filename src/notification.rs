@@ -7,9 +7,12 @@ use crate::error::UserNotificationsError;
 use crate::private::decode_json;
 use crate::request::{NotificationRequest, NotificationRequestPayload};
 
+/// Wraps `UNNotification`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Notification {
+    /// The delivery date.
     pub date: SystemTime,
+    /// The originating notification request.
     pub request: NotificationRequest,
 }
 

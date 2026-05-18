@@ -16,23 +16,38 @@
     clippy::new_without_default
 )]
 
+/// Wrappers for `UNNotificationAction`, `UNTextInputNotificationAction`, and related option types.
 pub mod action;
+/// Wrappers for `UNNotificationAttachment` and attachment option keys.
 pub mod attachment;
+/// Wrappers for `UNNotificationCategory` and related option types.
 pub mod category;
+/// Wrappers for `UNUserNotificationCenter` and delegate integration.
 pub mod center;
+/// Wrappers for `UNNotificationContent`, `UNMutableNotificationContent`, and content-provider helpers.
 pub mod content;
+/// Helpers for the `UNNotificationContentExtension` protocol and extension context APIs.
 pub mod content_extension;
+/// Error types and constants for the `UserNotifications` framework.
 pub mod error;
+/// Low-level FFI bindings that back the safe `UserNotifications` wrappers.
 pub mod ffi;
+/// Wrappers for `UNNotification`.
 pub mod notification;
 mod option_set;
 mod private;
+/// Wrappers for `UNNotificationRequest`.
 pub mod request;
+/// Wrappers for `UNNotificationResponse` and presentation options.
 pub mod response;
+/// Helpers for the `UNNotificationServiceExtension` API surface.
 pub mod service_extension;
+/// Wrappers for `UNNotificationSettings` and authorization-related enums.
 pub mod settings;
+/// Wrappers for `UNNotificationTrigger` and concrete trigger types.
 pub mod trigger;
 
+/// Async wrappers for `UNUserNotificationCenter` completion-handler APIs.
 #[cfg(feature = "async")]
 pub mod async_api;
 

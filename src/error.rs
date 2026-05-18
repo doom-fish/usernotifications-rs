@@ -5,26 +5,41 @@ use libc::free;
 
 use crate::ffi;
 
+/// Matches `UNErrorDomain`.
 pub const USER_NOTIFICATIONS_ERROR_DOMAIN: &str = "UNErrorDomain";
 
+/// Wraps documented `UNErrorCode` values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum UserNotificationsFrameworkErrorCode {
+    /// The notifications not allowed variant.
     NotificationsNotAllowed = 1,
+    /// The attachment invalid url variant.
     AttachmentInvalidUrl = 100,
+    /// The attachment unrecognized type variant.
     AttachmentUnrecognizedType = 101,
+    /// The attachment invalid file size variant.
     AttachmentInvalidFileSize = 102,
+    /// The attachment not in data store variant.
     AttachmentNotInDataStore = 103,
+    /// The attachment move into data store failed variant.
     AttachmentMoveIntoDataStoreFailed = 104,
+    /// The attachment corrupt variant.
     AttachmentCorrupt = 105,
+    /// The notification invalid no date variant.
     NotificationInvalidNoDate = 1400,
+    /// The notification invalid no content variant.
     NotificationInvalidNoContent = 1401,
+    /// The content providing object not allowed variant.
     ContentProvidingObjectNotAllowed = 1500,
+    /// The content providing invalid variant.
     ContentProvidingInvalid = 1501,
+    /// The badge input invalid variant.
     BadgeInputInvalid = 1600,
 }
 
 impl UserNotificationsFrameworkErrorCode {
+    /// Converts a raw framework value into a documented error code.
     #[must_use]
     pub const fn from_raw(raw: i32) -> Option<Self> {
         match raw {
@@ -45,15 +60,25 @@ impl UserNotificationsFrameworkErrorCode {
     }
 }
 
+/// Errors returned by the safe `UserNotifications` wrappers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum UserNotificationsError {
+    /// Represents an invalid argument reported by the bridge.
     InvalidArgument(String),
+    /// Represents an error returned by the `UserNotifications` framework.
     FrameworkError(String),
-    Unknown { code: i32, message: String },
+    /// Represents an unknown framework or bridge error code.
+    Unknown {
+        /// The raw error code.
+        code: i32,
+        /// The associated error message.
+        message: String,
+    },
 }
 
 impl UserNotificationsError {
+    /// Returns the raw status code for this error.
     #[must_use]
     pub const fn code(&self) -> i32 {
         match self {
@@ -63,6 +88,7 @@ impl UserNotificationsError {
         }
     }
 
+    /// Returns the human-readable message for this error.
     #[must_use]
     pub fn message(&self) -> &str {
         match self {

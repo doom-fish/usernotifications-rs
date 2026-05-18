@@ -9,27 +9,42 @@ use crate::private::decode_json;
 raw_option_set!(AuthorizationOptions);
 
 impl AuthorizationOptions {
+    /// No flags.
     pub const NONE: Self = Self(0);
+    /// The badge flag.
     pub const BADGE: Self = Self(1 << 0);
+    /// The sound flag.
     pub const SOUND: Self = Self(1 << 1);
+    /// The alert flag.
     pub const ALERT: Self = Self(1 << 2);
+    /// The car play flag.
     pub const CAR_PLAY: Self = Self(1 << 3);
+    /// The critical alert flag.
     pub const CRITICAL_ALERT: Self = Self(1 << 4);
+    /// The provides app notification settings flag.
     pub const PROVIDES_APP_NOTIFICATION_SETTINGS: Self = Self(1 << 5);
+    /// The provisional flag.
     pub const PROVISIONAL: Self = Self(1 << 6);
+    /// The time sensitive flag.
     pub const TIME_SENSITIVE: Self = Self(1 << 8);
 }
 
+/// Wraps the `UNAuthorizationStatus` enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum AuthorizationStatus {
+    /// Authorization has not been requested yet.
     NotDetermined = 0,
+    /// Authorization was denied.
     Denied = 1,
+    /// Authorization was granted.
     Authorized = 2,
+    /// Provisional authorization was granted.
     Provisional = 3,
 }
 
 impl AuthorizationStatus {
+    /// Converts a raw framework value into an authorization status.
     #[must_use]
     pub const fn from_raw(raw: i32) -> Self {
         match raw {
@@ -41,15 +56,20 @@ impl AuthorizationStatus {
     }
 }
 
+/// Wraps the `UNNotificationSetting` enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum NotificationSetting {
+    /// The setting is not supported on this platform.
     NotSupported = 0,
+    /// The setting is disabled.
     Disabled = 1,
+    /// The setting is enabled.
     Enabled = 2,
 }
 
 impl NotificationSetting {
+    /// Converts a raw framework value into a notification setting.
     #[must_use]
     pub const fn from_raw(raw: i32) -> Self {
         match raw {
@@ -60,15 +80,20 @@ impl NotificationSetting {
     }
 }
 
+/// Wraps the `UNAlertStyle` enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum AlertStyle {
+    /// No alert style is used.
     None = 0,
+    /// Uses the banner alert style.
     Banner = 1,
+    /// Uses the alert style.
     Alert = 2,
 }
 
 impl AlertStyle {
+    /// Converts a raw framework value into an alert style.
     #[must_use]
     pub const fn from_raw(raw: i32) -> Self {
         match raw {
@@ -79,15 +104,20 @@ impl AlertStyle {
     }
 }
 
+/// Wraps the `UNShowPreviewsSetting` enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum ShowPreviewsSetting {
+    /// Always show notification previews.
     Always = 0,
+    /// Show previews only when the device is authenticated.
     WhenAuthenticated = 1,
+    /// Never show notification previews.
     Never = 2,
 }
 
 impl ShowPreviewsSetting {
+    /// Converts a raw framework value into a show-previews setting.
     #[must_use]
     pub const fn from_raw(raw: i32) -> Self {
         match raw {
@@ -98,20 +128,34 @@ impl ShowPreviewsSetting {
     }
 }
 
+/// Wraps `UNNotificationSettings`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NotificationSettings {
+    /// The authorization status.
     pub authorization_status: AuthorizationStatus,
+    /// The sound setting.
     pub sound_setting: NotificationSetting,
+    /// The badge setting.
     pub badge_setting: NotificationSetting,
+    /// The alert setting.
     pub alert_setting: NotificationSetting,
+    /// The notification center setting.
     pub notification_center_setting: NotificationSetting,
+    /// The lock screen setting.
     pub lock_screen_setting: NotificationSetting,
+    /// The alert style.
     pub alert_style: AlertStyle,
+    /// The show previews setting.
     pub show_previews_setting: ShowPreviewsSetting,
+    /// The critical alert setting.
     pub critical_alert_setting: NotificationSetting,
+    /// Whether the app provides in-app notification settings.
     pub provides_app_notification_settings: bool,
+    /// The time sensitive setting.
     pub time_sensitive_setting: NotificationSetting,
+    /// The scheduled delivery setting.
     pub scheduled_delivery_setting: NotificationSetting,
+    /// The direct messages setting.
     pub direct_messages_setting: NotificationSetting,
 }
 

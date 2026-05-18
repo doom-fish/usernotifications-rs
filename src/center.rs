@@ -26,7 +26,9 @@ mod private {
     pub trait Sealed {}
 }
 
+/// Wraps the `UNUserNotificationCenterDelegate` callback surface.
 pub trait UserNotificationCenterDelegate: Send + private::Sealed {
+    /// Handles a notification that is about to be presented while the app is running.
     fn will_present_notification(
         &mut self,
         notification: Notification,
@@ -35,19 +37,23 @@ pub trait UserNotificationCenterDelegate: Send + private::Sealed {
         NotificationPresentationOptions::NONE
     }
 
+    /// Handles a user response to a delivered notification.
     fn did_receive_notification_response(&mut self, response: NotificationResponse) {
         let _ = response;
     }
 
+    /// Handles a request to open the app's notification settings.
     fn open_settings_for_notification(&mut self, notification: Option<Notification>) {
         let _ = notification;
     }
 }
 
-type WillPresentHandler = Box<dyn FnMut(Notification) -> NotificationPresentationOptions + Send + 'static>;
+type WillPresentHandler =
+    Box<dyn FnMut(Notification) -> NotificationPresentationOptions + Send + 'static>;
 type ResponseHandler = Box<dyn FnMut(NotificationResponse) + Send + 'static>;
 type OpenSettingsHandler = Box<dyn FnMut(Option<Notification>) + Send + 'static>;
 
+/// Closure-based builder for a `UNUserNotificationCenterDelegate` implementation.
 #[allow(clippy::type_complexity)]
 pub struct UserNotificationCenterCallbacks {
     will_present: Option<WillPresentHandler>,
@@ -56,6 +62,7 @@ pub struct UserNotificationCenterCallbacks {
 }
 
 impl UserNotificationCenterCallbacks {
+    /// Creates an empty callback-based notification center delegate.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -65,6 +72,7 @@ impl UserNotificationCenterCallbacks {
         }
     }
 
+    /// Registers a callback for will present.
     #[must_use]
     pub fn on_will_present(
         mut self,
@@ -74,6 +82,7 @@ impl UserNotificationCenterCallbacks {
         self
     }
 
+    /// Registers a callback for response.
     #[must_use]
     pub fn on_response(
         mut self,
@@ -83,6 +92,7 @@ impl UserNotificationCenterCallbacks {
         self
     }
 
+    /// Registers a callback for open settings.
     #[must_use]
     pub fn on_open_settings(
         mut self,
@@ -129,6 +139,7 @@ struct CallbackState {
     delegate: Mutex<Box<dyn UserNotificationCenterDelegate>>,
 }
 
+/// Wraps `UNUserNotificationCenter`.
 pub struct UserNotificationCenter {
     raw: *mut c_void,
     callback_state: Option<Box<CallbackState>>,
@@ -192,10 +203,12 @@ extern "C" fn center_will_present_trampoline(
 }
 
 impl UserNotificationCenter {
+    /// Returns the shared current notification center.
     pub fn current() -> Result<Self, UserNotificationsError> {
         Self::current_inner(None)
     }
 
+    /// Returns the current notification center with a delegate installed.
     pub fn with_delegate<D>(delegate: D) -> Result<Self, UserNotificationsError>
     where
         D: UserNotificationCenterDelegate + 'static,
@@ -203,6 +216,7 @@ impl UserNotificationCenter {
         Self::current_inner(Some(Box::new(delegate)))
     }
 
+    /// Returns the current notification center with callback handlers installed.
     pub fn with_callbacks(
         callbacks: UserNotificationCenterCallbacks,
     ) -> Result<Self, UserNotificationsError> {
@@ -229,6 +243,7 @@ impl UserNotificationCenter {
         Ok(center)
     }
 
+    /// Installs a delegate for notification center callbacks.
     pub fn set_delegate<D>(&mut self, delegate: D) -> Result<(), UserNotificationsError>
     where
         D: UserNotificationCenterDelegate + 'static,
@@ -236,6 +251,7 @@ impl UserNotificationCenter {
         self.set_boxed_delegate(Box::new(delegate))
     }
 
+    /// Installs callback handlers for notification center callbacks.
     pub fn set_callbacks(
         &mut self,
         callbacks: UserNotificationCenterCallbacks,
@@ -274,11 +290,13 @@ impl UserNotificationCenter {
         }
     }
 
+    /// Removes any installed delegate callbacks.
     pub fn clear_delegate(&mut self) {
         unsafe { ffi::center::un_center_clear_delegate(self.raw) };
         self.callback_state = None;
     }
 
+    /// Requests notification authorization from the system.
     pub fn request_authorization(
         &self,
         options: AuthorizationOptions,
@@ -300,14 +318,18 @@ impl UserNotificationCenter {
         }
     }
 
+    /// Returns whether notification content extensions are supported.
     #[must_use]
     pub fn supports_content_extensions(&self) -> bool {
         unsafe { ffi::center::un_center_supports_content_extensions(self.raw) }
     }
 
+    /// Sets the application badge count.
     pub fn set_badge_count(&self, new_badge_count: isize) -> Result<(), UserNotificationsError> {
         let mut error = core::ptr::null_mut();
-        let status = unsafe { ffi::center::un_center_set_badge_count(self.raw, new_badge_count, &mut error) };
+        let status = unsafe {
+            ffi::center::un_center_set_badge_count(self.raw, new_badge_count, &mut error)
+        };
         if status == ffi::status::OK {
             Ok(())
         } else {
@@ -315,9 +337,11 @@ impl UserNotificationCenter {
         }
     }
 
+    /// Returns the current notification settings.
     pub fn notification_settings(&self) -> Result<NotificationSettings, UserNotificationsError> {
         let mut error = core::ptr::null_mut();
-        let payload = unsafe { ffi::un_center_get_notification_settings_json(self.raw, &mut error) };
+        let payload =
+            unsafe { ffi::un_center_get_notification_settings_json(self.raw, &mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
@@ -325,6 +349,7 @@ impl UserNotificationCenter {
         }
     }
 
+    /// Registers notification categories with the center.
     pub fn set_notification_categories(
         &self,
         categories: &[NotificationCategory],
@@ -346,6 +371,7 @@ impl UserNotificationCenter {
         }
     }
 
+    /// Returns the registered notification categories.
     pub fn notification_categories(
         &self,
     ) -> Result<Vec<NotificationCategory>, UserNotificationsError> {
@@ -360,6 +386,7 @@ impl UserNotificationCenter {
         }
     }
 
+    /// Schedules a notification request.
     pub fn add_notification_request(
         &self,
         request: &NotificationRequest,
@@ -367,7 +394,8 @@ impl UserNotificationCenter {
         let request = encode_request_json(request)?;
         let request = to_cstring(&request)?;
         let mut error = core::ptr::null_mut();
-        let status = unsafe { ffi::request::un_center_add_request(self.raw, request.as_ptr(), &mut error) };
+        let status =
+            unsafe { ffi::request::un_center_add_request(self.raw, request.as_ptr(), &mut error) };
         if status == ffi::status::OK {
             Ok(())
         } else {
@@ -375,11 +403,13 @@ impl UserNotificationCenter {
         }
     }
 
+    /// Returns pending notification requests.
     pub fn pending_notification_requests(
         &self,
     ) -> Result<Vec<NotificationRequest>, UserNotificationsError> {
         let mut error = core::ptr::null_mut();
-        let payload = unsafe { ffi::request::un_center_get_pending_requests_json(self.raw, &mut error) };
+        let payload =
+            unsafe { ffi::request::un_center_get_pending_requests_json(self.raw, &mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
@@ -387,6 +417,7 @@ impl UserNotificationCenter {
         }
     }
 
+    /// Removes pending notification requests matching the provided identifiers.
     pub fn remove_pending_notification_requests(
         &self,
         identifiers: &[&str],
@@ -396,10 +427,12 @@ impl UserNotificationCenter {
         Ok(())
     }
 
+    /// Removes all pending notification requests.
     pub fn remove_all_pending_notification_requests(&self) {
         unsafe { ffi::request::un_center_remove_all_pending_requests(self.raw) };
     }
 
+    /// Returns delivered notifications.
     pub fn delivered_notifications(&self) -> Result<Vec<Notification>, UserNotificationsError> {
         let mut error = core::ptr::null_mut();
         let payload = unsafe {
@@ -412,15 +445,19 @@ impl UserNotificationCenter {
         }
     }
 
+    /// Removes delivered notifications matching the provided identifiers.
     pub fn remove_delivered_notifications(
         &self,
         identifiers: &[&str],
     ) -> Result<(), UserNotificationsError> {
         let identifiers = encode_identifiers(identifiers)?;
-        unsafe { ffi::response::un_center_remove_delivered_notifications(self.raw, identifiers.as_ptr()) };
+        unsafe {
+            ffi::response::un_center_remove_delivered_notifications(self.raw, identifiers.as_ptr());
+        };
         Ok(())
     }
 
+    /// Removes all delivered notifications.
     pub fn remove_all_delivered_notifications(&self) {
         unsafe { ffi::response::un_center_remove_all_delivered_notifications(self.raw) };
     }

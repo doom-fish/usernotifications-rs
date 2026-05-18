@@ -10,7 +10,7 @@ checksum = "f18f9f1747c86d067ade130403a7bfc1ba3609de64d4b69ea0ac3296f3052d08"
 
 [[package]]
 name = "doom-fish-utils"
-version = "0.1.1"
+version = "0.2.0"
 
 [[package]]
 name = "itoa"
@@ -116,7 +116,7 @@ checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
 
 [[package]]
 name = "usernotifications-rs"
-version = "0.3.1"
+version = "0.3.4"
 dependencies = [
  "apple-cf",
  "doom-fish-utils",
