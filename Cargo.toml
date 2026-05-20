@@ -1,6 +1,6 @@
 [package]
 name = "usernotifications-rs"
-version = "0.3.5"
+version = "0.3.6"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/doom-fish/usernotifications-rs"
@@ -61,6 +61,14 @@ maintenance = { status = "actively-developed" }
 
 [[example]]
 name = "01_smoke"
+
+[[example]]
+name = "02_async_authorization"
+required-features = ["async"]
+
+[[example]]
+name = "03_async_queries"
+required-features = ["async"]
 
 [profile.release]
 debug = "full"

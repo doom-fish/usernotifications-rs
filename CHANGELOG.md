@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.3.6] - 2026-05-20
+
+- Clippy hygiene sweep: cleared all `-D warnings` lints across the crate. No public API change.
+
 ## [0.3.5] - 2026-05-20
 
 - Added in-`src/` unit tests across `settings`, `response`, `action`, `trigger`, `content`, and `error`, providing fast `cargo test --lib` fail-fast signal alongside the existing integration tests under `tests/`.
