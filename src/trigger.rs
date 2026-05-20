@@ -290,3 +290,68 @@ fn timestamp_from_system_time_opt(time: Option<&SystemTime>) -> Option<f64> {
 fn system_time_from_timestamp_opt(timestamp: Option<f64>) -> Option<SystemTime> {
     timestamp.map(|timestamp| UNIX_EPOCH + Duration::from_secs_f64(timestamp.max(0.0)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{CalendarTrigger, DateComponents, NotificationTrigger, TimeIntervalTrigger};
+
+    #[test]
+    fn date_components_round_trip_preserves_values() {
+        let components = DateComponents::new()
+            .with_year(2026)
+            .with_month(5)
+            .with_day(20)
+            .with_hour(12)
+            .with_minute(34)
+            .with_second(56)
+            .with_weekday(4);
+
+        let encoded = serde_json::to_string(&components).unwrap();
+        let roundtrip: DateComponents = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(roundtrip, components);
+    }
+
+    #[test]
+    fn time_interval_trigger_new_sets_expected_fields() {
+        let trigger = TimeIntervalTrigger::new(60.0, true);
+
+        assert!((trigger.time_interval - 60.0).abs() < f64::EPSILON);
+        assert!(trigger.repeats);
+        assert!(trigger.next_trigger_date.is_none());
+    }
+
+    #[test]
+    fn calendar_trigger_new_sets_expected_fields() {
+        let components = DateComponents::new()
+            .with_month(5)
+            .with_day(20)
+            .with_hour(9);
+        let trigger = CalendarTrigger::new(components.clone(), false);
+
+        assert_eq!(trigger.date_components, components);
+        assert!(!trigger.repeats);
+        assert!(trigger.next_trigger_date.is_none());
+    }
+
+    #[test]
+    fn notification_trigger_time_interval_helper_wraps_constructor() {
+        let trigger = NotificationTrigger::time_interval(30.0, true);
+
+        assert_eq!(
+            trigger,
+            NotificationTrigger::TimeInterval(TimeIntervalTrigger::new(30.0, true)),
+        );
+    }
+
+    #[test]
+    fn notification_trigger_calendar_and_push_helpers_wrap_expected_variants() {
+        let components = DateComponents::new().with_month(5).with_day(20);
+
+        assert_eq!(
+            NotificationTrigger::calendar(components.clone(), false),
+            NotificationTrigger::Calendar(CalendarTrigger::new(components, false)),
+        );
+        assert_eq!(NotificationTrigger::push(), NotificationTrigger::Push);
+    }
+}

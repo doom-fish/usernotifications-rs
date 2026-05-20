@@ -774,3 +774,130 @@ pub(crate) fn decode_content_json(
 ) -> Result<NotificationContent, UserNotificationsError> {
     decode_json::<NotificationContentPayload>(ptr).map(Into::into)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        LocalizedNotificationString, NotificationContent, NotificationContentPayload,
+        NotificationInterruptionLevel, NotificationSound,
+    };
+    use serde_json::json;
+
+    #[test]
+    fn localized_notification_string_round_trip_preserves_key_and_arguments() {
+        let localized = LocalizedNotificationString::new("TITLE_KEY")
+            .with_argument("Alex")
+            .with_argument(3);
+
+        let encoded = serde_json::to_string(&localized).unwrap();
+        let roundtrip: LocalizedNotificationString = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(roundtrip, localized);
+        assert_eq!(roundtrip.key, "TITLE_KEY");
+        assert_eq!(roundtrip.arguments, vec![json!("Alex"), json!(3)]);
+    }
+
+    #[test]
+    fn notification_content_new_sets_expected_defaults() {
+        let content = NotificationContent::new("Title", "Body");
+
+        assert_eq!(content.title, "Title");
+        assert_eq!(content.body, "Body");
+        assert_eq!(content.summary_argument_count, 1);
+        assert_eq!(content.subtitle, "");
+        assert_eq!(content.category_identifier, "");
+        assert_eq!(content.thread_identifier, "");
+        assert_eq!(content.summary_argument, "");
+        assert!(content.badge.is_none());
+        assert!(content.user_info.is_none());
+        assert!(content.sound.is_none());
+        assert!(content.attachments.is_empty());
+        assert!(content.interruption_level.is_none());
+        assert!(content.relevance_score.is_none());
+        assert!(content.filter_criteria.is_none());
+        assert!(content.localized_title.is_none());
+        assert!(content.localized_subtitle.is_none());
+        assert!(content.localized_body.is_none());
+        assert!(content.localized_summary_argument.is_none());
+    }
+
+    #[test]
+    fn notification_content_builder_sets_expected_fields() {
+        let localized_title = LocalizedNotificationString::new("TITLE");
+        let localized_subtitle = LocalizedNotificationString::new("SUBTITLE").with_argument("Team");
+        let localized_body = LocalizedNotificationString::new("BODY").with_argument(2);
+        let localized_summary_argument = LocalizedNotificationString::new("SUMMARY");
+
+        let content = NotificationContent::new("Title", "Body")
+            .with_subtitle("Subtitle")
+            .with_badge(7)
+            .with_category_identifier("messages")
+            .with_thread_identifier("thread-1")
+            .with_user_info(json!({ "unread": 7 }))
+            .with_sound(NotificationSound::Named("ding.aiff".into()))
+            .with_summary_argument("Messages")
+            .with_summary_argument_count(7)
+            .with_interruption_level(NotificationInterruptionLevel::TimeSensitive)
+            .with_relevance_score(0.5)
+            .with_filter_criteria("conversation")
+            .with_localized_title(localized_title.clone())
+            .with_localized_subtitle(localized_subtitle.clone())
+            .with_localized_body(localized_body.clone())
+            .with_localized_summary_argument(localized_summary_argument.clone());
+
+        assert_eq!(content.subtitle, "Subtitle");
+        assert_eq!(content.badge, Some(7));
+        assert_eq!(content.category_identifier, "messages");
+        assert_eq!(content.thread_identifier, "thread-1");
+        assert_eq!(content.user_info, Some(json!({ "unread": 7 })));
+        assert_eq!(
+            content.sound,
+            Some(NotificationSound::Named("ding.aiff".into()))
+        );
+        assert_eq!(content.summary_argument, "Messages");
+        assert_eq!(content.summary_argument_count, 7);
+        assert_eq!(
+            content.interruption_level,
+            Some(NotificationInterruptionLevel::TimeSensitive),
+        );
+        assert!(matches!(
+            content.relevance_score,
+            Some(score) if (score - 0.5).abs() < f64::EPSILON,
+        ));
+        assert_eq!(content.filter_criteria.as_deref(), Some("conversation"));
+        assert_eq!(content.localized_title, Some(localized_title));
+        assert_eq!(content.localized_subtitle, Some(localized_subtitle));
+        assert_eq!(content.localized_body, Some(localized_body));
+        assert_eq!(
+            content.localized_summary_argument,
+            Some(localized_summary_argument),
+        );
+    }
+
+    #[test]
+    fn notification_content_payload_round_trip_preserves_values() {
+        let content = NotificationContent::new("Title", "Body")
+            .with_subtitle("Subtitle")
+            .with_badge(3)
+            .with_category_identifier("inbox")
+            .with_thread_identifier("thread-42")
+            .with_user_info(json!({ "id": 42 }))
+            .with_sound(NotificationSound::CriticalNamed {
+                name: "alert.aiff".into(),
+                volume: Some(0.75),
+            })
+            .with_summary_argument("Inbox")
+            .with_summary_argument_count(3)
+            .with_interruption_level(NotificationInterruptionLevel::Critical)
+            .with_relevance_score(1.0)
+            .with_filter_criteria("important")
+            .with_localized_title(LocalizedNotificationString::new("TITLE").with_argument("Alex"))
+            .with_localized_subtitle(LocalizedNotificationString::new("SUBTITLE"))
+            .with_localized_body(LocalizedNotificationString::new("BODY").with_argument(1))
+            .with_localized_summary_argument(LocalizedNotificationString::new("SUMMARY"));
+
+        let roundtrip = NotificationContent::from(NotificationContentPayload::from(&content));
+
+        assert_eq!(roundtrip, content);
+    }
+}

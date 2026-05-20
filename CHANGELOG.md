@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.5] - 2026-05-20
+
+- Added in-`src/` unit tests across `settings`, `response`, `action`, `trigger`, `content`, and `error`, providing fast `cargo test --lib` fail-fast signal alongside the existing integration tests under `tests/`.
+- Widened the `doom-fish-utils` dependency bound to `<0.4` so the sibling 0.3.x crate resolves during release verification.
+
 ## [0.3.4] - 2026-05-18
 
 - Added rustdoc coverage across the public UserNotifications wrappers, lifting crate docs from 2.2% to full public-item coverage.

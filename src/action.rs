@@ -241,3 +241,102 @@ pub(crate) fn decode_action_json(
 ) -> Result<NotificationAction, UserNotificationsError> {
     decode_json::<NotificationActionPayload>(ptr).map(Into::into)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        NotificationAction, NotificationActionIcon, NotificationActionIconPayload,
+        NotificationActionOptions, NotificationActionPayload,
+    };
+    use crate::content::LocalizedNotificationString;
+
+    #[test]
+    fn notification_action_options_round_trip_bits() {
+        let options = NotificationActionOptions::AUTHENTICATION_REQUIRED
+            | NotificationActionOptions::FOREGROUND;
+        let roundtrip = NotificationActionOptions::from_bits(options.bits());
+
+        assert_eq!(roundtrip.bits(), options.bits());
+        assert!(roundtrip.contains(NotificationActionOptions::AUTHENTICATION_REQUIRED));
+        assert!(roundtrip.contains(NotificationActionOptions::FOREGROUND));
+        assert!(!roundtrip.contains(NotificationActionOptions::DESTRUCTIVE));
+    }
+
+    #[test]
+    fn notification_action_new_sets_expected_defaults() {
+        let options = NotificationActionOptions::DESTRUCTIVE;
+        let action = NotificationAction::new("delete", "Delete", options);
+
+        assert_eq!(action.identifier, "delete");
+        assert_eq!(action.title, "Delete");
+        assert_eq!(action.options, options);
+        assert!(action.icon.is_none());
+        assert!(action.text_input_button_title.is_none());
+        assert!(action.text_input_placeholder.is_none());
+        assert!(action.localized_title.is_none());
+        assert!(action.localized_text_input_button_title.is_none());
+        assert!(action.localized_text_input_placeholder.is_none());
+    }
+
+    #[test]
+    fn notification_action_new_text_input_sets_text_fields() {
+        let action = NotificationAction::new_text_input(
+            "reply",
+            "Reply",
+            NotificationActionOptions::FOREGROUND,
+            "Send",
+            "Type a reply",
+        );
+
+        assert_eq!(action.identifier, "reply");
+        assert_eq!(action.title, "Reply");
+        assert_eq!(action.options, NotificationActionOptions::FOREGROUND);
+        assert_eq!(action.text_input_button_title.as_deref(), Some("Send"));
+        assert_eq!(
+            action.text_input_placeholder.as_deref(),
+            Some("Type a reply")
+        );
+        assert!(action.icon.is_none());
+    }
+
+    #[test]
+    fn notification_action_icon_payload_round_trip_preserves_variants() {
+        let template = NotificationActionIcon::TemplateImage("reply".into());
+        let template_roundtrip: NotificationActionIcon =
+            NotificationActionIconPayload::from(&template).into();
+        let system = NotificationActionIcon::SystemImage("paperplane".into());
+        let system_roundtrip: NotificationActionIcon =
+            NotificationActionIconPayload::from(&system).into();
+        let unknown = NotificationActionIcon::from(NotificationActionIconPayload {
+            kind: "systemImage".into(),
+            name: None,
+        });
+
+        assert_eq!(template_roundtrip, template);
+        assert_eq!(system_roundtrip, system);
+        assert_eq!(unknown, NotificationActionIcon::Unknown);
+    }
+
+    #[test]
+    fn notification_action_payload_round_trip_preserves_optional_fields() {
+        let action = NotificationAction::new_text_input(
+            "reply",
+            "Reply",
+            NotificationActionOptions::FOREGROUND,
+            "Send",
+            "Type a reply",
+        )
+        .with_icon(NotificationActionIcon::SystemImage(
+            "arrowshape.turn.up.left".into(),
+        ))
+        .with_localized_title(
+            LocalizedNotificationString::new("ACTION_TITLE").with_argument("Alex"),
+        )
+        .with_localized_text_input_button_title(LocalizedNotificationString::new("SEND_BUTTON"))
+        .with_localized_text_input_placeholder(LocalizedNotificationString::new("PLACEHOLDER"));
+
+        let roundtrip = NotificationAction::from(NotificationActionPayload::from(&action));
+
+        assert_eq!(roundtrip, action);
+    }
+}

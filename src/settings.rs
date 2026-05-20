@@ -205,3 +205,94 @@ pub(crate) fn decode_settings_json(
 ) -> Result<NotificationSettings, UserNotificationsError> {
     decode_json::<NotificationSettingsPayload>(ptr).map(Into::into)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        AlertStyle, AuthorizationOptions, AuthorizationStatus, NotificationSetting,
+        ShowPreviewsSetting,
+    };
+
+    #[test]
+    fn authorization_options_round_trip_bits() {
+        let options = AuthorizationOptions::BADGE
+            | AuthorizationOptions::ALERT
+            | AuthorizationOptions::PROVISIONAL;
+        let roundtrip = AuthorizationOptions::from_bits(options.bits());
+
+        assert_eq!(roundtrip.bits(), options.bits());
+        assert!(roundtrip.contains(AuthorizationOptions::BADGE));
+        assert!(roundtrip.contains(AuthorizationOptions::ALERT));
+        assert!(roundtrip.contains(AuthorizationOptions::PROVISIONAL));
+        assert!(!roundtrip.contains(AuthorizationOptions::SOUND));
+    }
+
+    #[test]
+    fn authorization_status_from_raw_matches_documented_values() {
+        assert_eq!(
+            AuthorizationStatus::from_raw(0),
+            AuthorizationStatus::NotDetermined
+        );
+        assert_eq!(
+            AuthorizationStatus::from_raw(1),
+            AuthorizationStatus::Denied
+        );
+        assert_eq!(
+            AuthorizationStatus::from_raw(2),
+            AuthorizationStatus::Authorized
+        );
+        assert_eq!(
+            AuthorizationStatus::from_raw(3),
+            AuthorizationStatus::Provisional
+        );
+        assert_eq!(
+            AuthorizationStatus::from_raw(99),
+            AuthorizationStatus::NotDetermined
+        );
+    }
+
+    #[test]
+    fn notification_setting_from_raw_matches_documented_values() {
+        assert_eq!(
+            NotificationSetting::from_raw(0),
+            NotificationSetting::NotSupported
+        );
+        assert_eq!(
+            NotificationSetting::from_raw(1),
+            NotificationSetting::Disabled
+        );
+        assert_eq!(
+            NotificationSetting::from_raw(2),
+            NotificationSetting::Enabled
+        );
+        assert_eq!(
+            NotificationSetting::from_raw(99),
+            NotificationSetting::NotSupported
+        );
+    }
+
+    #[test]
+    fn alert_style_from_raw_matches_documented_values() {
+        assert_eq!(AlertStyle::from_raw(0), AlertStyle::None);
+        assert_eq!(AlertStyle::from_raw(1), AlertStyle::Banner);
+        assert_eq!(AlertStyle::from_raw(2), AlertStyle::Alert);
+        assert_eq!(AlertStyle::from_raw(99), AlertStyle::None);
+    }
+
+    #[test]
+    fn show_previews_setting_from_raw_matches_documented_values() {
+        assert_eq!(
+            ShowPreviewsSetting::from_raw(0),
+            ShowPreviewsSetting::Always
+        );
+        assert_eq!(
+            ShowPreviewsSetting::from_raw(1),
+            ShowPreviewsSetting::WhenAuthenticated,
+        );
+        assert_eq!(ShowPreviewsSetting::from_raw(2), ShowPreviewsSetting::Never);
+        assert_eq!(
+            ShowPreviewsSetting::from_raw(99),
+            ShowPreviewsSetting::Always
+        );
+    }
+}

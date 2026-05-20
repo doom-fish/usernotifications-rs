@@ -116,3 +116,31 @@ pub fn dismiss_action_identifier() -> &'static str {
         })
         .as_str()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::NotificationPresentationOptions;
+
+    #[test]
+    fn notification_presentation_options_round_trip_bits() {
+        let options = NotificationPresentationOptions::BADGE
+            | NotificationPresentationOptions::SOUND
+            | NotificationPresentationOptions::BANNER;
+        let roundtrip = NotificationPresentationOptions::from_bits(options.bits());
+
+        assert_eq!(roundtrip.bits(), options.bits());
+        assert!(roundtrip.contains(NotificationPresentationOptions::BADGE));
+        assert!(roundtrip.contains(NotificationPresentationOptions::SOUND));
+        assert!(roundtrip.contains(NotificationPresentationOptions::BANNER));
+        assert!(!roundtrip.contains(NotificationPresentationOptions::ALERT));
+    }
+
+    #[test]
+    fn notification_presentation_options_none_is_empty() {
+        let options = NotificationPresentationOptions::NONE;
+
+        assert_eq!(options.bits(), 0);
+        assert!(!options.contains(NotificationPresentationOptions::BADGE));
+        assert!(!options.contains(NotificationPresentationOptions::LIST));
+    }
+}
