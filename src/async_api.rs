@@ -44,6 +44,7 @@ use crate::{
     request::decode_requests_json, settings::decode_settings_json,
 };
 use doom_fish_utils::completion::{error_from_cstr, AsyncCompletion, AsyncCompletionFuture};
+use doom_fish_utils::panic_safe::catch_user_panic;
 use std::ffi::c_void;
 use std::future::Future;
 use std::pin::Pin;
@@ -58,25 +59,27 @@ extern "C" fn request_authorization_callback(
     error: *const i8,
     ctx: *mut c_void,
 ) {
-    if !error.is_null() {
-        // SAFETY: error is a valid C-string pointer passed from Swift FFI bridge.
-        let msg = unsafe { error_from_cstr(error) };
-        // SAFETY: ctx is a valid pointer to AsyncCompletion<bool> created by AsyncCompletion::create()
-        // and stored in the Swift bridge context. The callback will be called once with this pointer.
-        unsafe { AsyncCompletion::<bool>::complete_err(ctx, msg) };
-    } else if !result.is_null() {
-        let granted = unsafe {
-            // SAFETY: result is a pointer to a Swift-passed boolean value (single byte).
-            // The result pointer is valid for the lifetime of this callback.
-            let ptr = result.cast::<u8>();
-            *ptr != 0
-        };
-        // SAFETY: ctx is a valid pointer to AsyncCompletion<bool> created by AsyncCompletion::create().
-        unsafe { AsyncCompletion::<bool>::complete_ok(ctx, granted) };
-    } else {
-        // SAFETY: ctx is a valid pointer to AsyncCompletion<bool> created by AsyncCompletion::create().
-        unsafe { AsyncCompletion::<bool>::complete_err(ctx, "Unknown error".to_string()) };
-    }
+    catch_user_panic("request_authorization_callback", || {
+        if !error.is_null() {
+            // SAFETY: error is a valid C-string pointer passed from Swift FFI bridge.
+            let msg = unsafe { error_from_cstr(error) };
+            // SAFETY: ctx is a valid pointer to AsyncCompletion<bool> created by AsyncCompletion::create()
+            // and stored in the Swift bridge context. The callback will be called once with this pointer.
+            unsafe { AsyncCompletion::<bool>::complete_err(ctx, msg) };
+        } else if !result.is_null() {
+            let granted = unsafe {
+                // SAFETY: result is a pointer to a Swift-passed boolean value (single byte).
+                // The result pointer is valid for the lifetime of this callback.
+                let ptr = result.cast::<u8>();
+                *ptr != 0
+            };
+            // SAFETY: ctx is a valid pointer to AsyncCompletion<bool> created by AsyncCompletion::create().
+            unsafe { AsyncCompletion::<bool>::complete_ok(ctx, granted) };
+        } else {
+            // SAFETY: ctx is a valid pointer to AsyncCompletion<bool> created by AsyncCompletion::create().
+            unsafe { AsyncCompletion::<bool>::complete_err(ctx, "Unknown error".to_string()) };
+        }
+    });
 }
 
 /// Future returned by async `UNUserNotificationCenter.requestAuthorization` wrappers.
@@ -99,15 +102,17 @@ impl Future for RequestAuthorizationFuture {
 // ============================================================================
 
 extern "C" fn add_request_callback(_result: *const c_void, error: *const i8, ctx: *mut c_void) {
-    if error.is_null() {
-        // SAFETY: ctx is a valid pointer to AsyncCompletion<()> created by AsyncCompletion::create().
-        unsafe { AsyncCompletion::<()>::complete_ok(ctx, ()) };
-    } else {
-        // SAFETY: error is a valid C-string pointer passed from Swift FFI bridge.
-        let msg = unsafe { error_from_cstr(error) };
-        // SAFETY: ctx is a valid pointer to AsyncCompletion<()> created by AsyncCompletion::create().
-        unsafe { AsyncCompletion::<()>::complete_err(ctx, msg) };
-    }
+    catch_user_panic("add_request_callback", || {
+        if error.is_null() {
+            // SAFETY: ctx is a valid pointer to AsyncCompletion<()> created by AsyncCompletion::create().
+            unsafe { AsyncCompletion::<()>::complete_ok(ctx, ()) };
+        } else {
+            // SAFETY: error is a valid C-string pointer passed from Swift FFI bridge.
+            let msg = unsafe { error_from_cstr(error) };
+            // SAFETY: ctx is a valid pointer to AsyncCompletion<()> created by AsyncCompletion::create().
+            unsafe { AsyncCompletion::<()>::complete_err(ctx, msg) };
+        }
+    });
 }
 
 /// Future returned by async `UNUserNotificationCenter.addNotificationRequest` wrappers.
@@ -131,37 +136,39 @@ impl Future for AddRequestFuture {
 
 extern "C" fn get_delivered_callback(result: *const c_void, error: *const i8, ctx: *mut c_void) {
     use std::ffi::c_char;
-    if !error.is_null() {
-        // SAFETY: error is a valid C-string pointer passed from Swift FFI bridge.
-        let msg = unsafe { error_from_cstr(error) };
-        // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<Notification>> created by AsyncCompletion::create().
-        unsafe { AsyncCompletion::<Vec<Notification>>::complete_err(ctx, msg) };
-    } else if !result.is_null() {
-        // SAFETY: result is a valid pointer to a C-string JSON array passed from Swift FFI bridge.
-        let json_ptr = result as *mut c_char;
-        match decode_notifications_json(json_ptr) {
-            Ok(notifications) => {
-                // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<Notification>> created by AsyncCompletion::create().
-                unsafe {
-                    AsyncCompletion::<Vec<Notification>>::complete_ok(ctx, notifications);
+    catch_user_panic("get_delivered_callback", || {
+        if !error.is_null() {
+            // SAFETY: error is a valid C-string pointer passed from Swift FFI bridge.
+            let msg = unsafe { error_from_cstr(error) };
+            // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<Notification>> created by AsyncCompletion::create().
+            unsafe { AsyncCompletion::<Vec<Notification>>::complete_err(ctx, msg) };
+        } else if !result.is_null() {
+            // SAFETY: result is a valid pointer to a C-string JSON array passed from Swift FFI bridge.
+            let json_ptr = result as *mut c_char;
+            match decode_notifications_json(json_ptr) {
+                Ok(notifications) => {
+                    // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<Notification>> created by AsyncCompletion::create().
+                    unsafe {
+                        AsyncCompletion::<Vec<Notification>>::complete_ok(ctx, notifications);
+                    }
+                }
+                Err(e) => {
+                    // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<Notification>> created by AsyncCompletion::create().
+                    unsafe {
+                        AsyncCompletion::<Vec<Notification>>::complete_err(
+                            ctx,
+                            e.message().to_string(),
+                        );
+                    }
                 }
             }
-            Err(e) => {
-                // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<Notification>> created by AsyncCompletion::create().
-                unsafe {
-                    AsyncCompletion::<Vec<Notification>>::complete_err(
-                        ctx,
-                        e.message().to_string(),
-                    );
-                }
-            }
+        } else {
+            // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<Notification>> created by AsyncCompletion::create().
+            unsafe {
+                AsyncCompletion::<Vec<Notification>>::complete_err(ctx, "Unknown error".to_string());
+            };
         }
-    } else {
-        // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<Notification>> created by AsyncCompletion::create().
-        unsafe {
-            AsyncCompletion::<Vec<Notification>>::complete_err(ctx, "Unknown error".to_string());
-        };
-    }
+    });
 }
 
 /// Future returned by async delivered-notification queries on `UNUserNotificationCenter`.
@@ -185,40 +192,42 @@ impl Future for GetDeliveredFuture {
 
 extern "C" fn get_pending_callback(result: *const c_void, error: *const i8, ctx: *mut c_void) {
     use std::ffi::c_char;
-    if !error.is_null() {
-        // SAFETY: error is a valid C-string pointer passed from Swift FFI bridge.
-        let msg = unsafe { error_from_cstr(error) };
-        // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationRequest>> created by AsyncCompletion::create().
-        unsafe { AsyncCompletion::<Vec<NotificationRequest>>::complete_err(ctx, msg) };
-    } else if !result.is_null() {
-        // SAFETY: result is a valid pointer to a C-string JSON array passed from Swift FFI bridge.
-        let json_ptr = result as *mut c_char;
-        match decode_requests_json(json_ptr) {
-            Ok(requests) => {
-                // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationRequest>> created by AsyncCompletion::create().
-                unsafe {
-                    AsyncCompletion::<Vec<NotificationRequest>>::complete_ok(ctx, requests);
+    catch_user_panic("get_pending_callback", || {
+        if !error.is_null() {
+            // SAFETY: error is a valid C-string pointer passed from Swift FFI bridge.
+            let msg = unsafe { error_from_cstr(error) };
+            // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationRequest>> created by AsyncCompletion::create().
+            unsafe { AsyncCompletion::<Vec<NotificationRequest>>::complete_err(ctx, msg) };
+        } else if !result.is_null() {
+            // SAFETY: result is a valid pointer to a C-string JSON array passed from Swift FFI bridge.
+            let json_ptr = result as *mut c_char;
+            match decode_requests_json(json_ptr) {
+                Ok(requests) => {
+                    // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationRequest>> created by AsyncCompletion::create().
+                    unsafe {
+                        AsyncCompletion::<Vec<NotificationRequest>>::complete_ok(ctx, requests);
+                    }
+                }
+                Err(e) => {
+                    // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationRequest>> created by AsyncCompletion::create().
+                    unsafe {
+                        AsyncCompletion::<Vec<NotificationRequest>>::complete_err(
+                            ctx,
+                            e.message().to_string(),
+                        );
+                    }
                 }
             }
-            Err(e) => {
-                // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationRequest>> created by AsyncCompletion::create().
-                unsafe {
-                    AsyncCompletion::<Vec<NotificationRequest>>::complete_err(
-                        ctx,
-                        e.message().to_string(),
-                    );
-                }
-            }
+        } else {
+            // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationRequest>> created by AsyncCompletion::create().
+            unsafe {
+                AsyncCompletion::<Vec<NotificationRequest>>::complete_err(
+                    ctx,
+                    "Unknown error".to_string(),
+                );
+            };
         }
-    } else {
-        // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationRequest>> created by AsyncCompletion::create().
-        unsafe {
-            AsyncCompletion::<Vec<NotificationRequest>>::complete_err(
-                ctx,
-                "Unknown error".to_string(),
-            );
-        };
-    }
+    });
 }
 
 /// Future returned by async pending-request queries on `UNUserNotificationCenter`.
@@ -242,40 +251,42 @@ impl Future for GetPendingFuture {
 
 extern "C" fn get_categories_callback(result: *const c_void, error: *const i8, ctx: *mut c_void) {
     use std::ffi::c_char;
-    if !error.is_null() {
-        // SAFETY: error is a valid C-string pointer passed from Swift FFI bridge.
-        let msg = unsafe { error_from_cstr(error) };
-        // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationCategory>> created by AsyncCompletion::create().
-        unsafe { AsyncCompletion::<Vec<NotificationCategory>>::complete_err(ctx, msg) };
-    } else if !result.is_null() {
-        // SAFETY: result is a valid pointer to a C-string JSON array passed from Swift FFI bridge.
-        let json_ptr = result as *mut c_char;
-        match decode_categories_json(json_ptr) {
-            Ok(categories) => {
-                // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationCategory>> created by AsyncCompletion::create().
-                unsafe {
-                    AsyncCompletion::<Vec<NotificationCategory>>::complete_ok(ctx, categories);
+    catch_user_panic("get_categories_callback", || {
+        if !error.is_null() {
+            // SAFETY: error is a valid C-string pointer passed from Swift FFI bridge.
+            let msg = unsafe { error_from_cstr(error) };
+            // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationCategory>> created by AsyncCompletion::create().
+            unsafe { AsyncCompletion::<Vec<NotificationCategory>>::complete_err(ctx, msg) };
+        } else if !result.is_null() {
+            // SAFETY: result is a valid pointer to a C-string JSON array passed from Swift FFI bridge.
+            let json_ptr = result as *mut c_char;
+            match decode_categories_json(json_ptr) {
+                Ok(categories) => {
+                    // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationCategory>> created by AsyncCompletion::create().
+                    unsafe {
+                        AsyncCompletion::<Vec<NotificationCategory>>::complete_ok(ctx, categories);
+                    }
+                }
+                Err(e) => {
+                    // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationCategory>> created by AsyncCompletion::create().
+                    unsafe {
+                        AsyncCompletion::<Vec<NotificationCategory>>::complete_err(
+                            ctx,
+                            e.message().to_string(),
+                        );
+                    }
                 }
             }
-            Err(e) => {
-                // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationCategory>> created by AsyncCompletion::create().
-                unsafe {
-                    AsyncCompletion::<Vec<NotificationCategory>>::complete_err(
-                        ctx,
-                        e.message().to_string(),
-                    );
-                }
-            }
+        } else {
+            // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationCategory>> created by AsyncCompletion::create().
+            unsafe {
+                AsyncCompletion::<Vec<NotificationCategory>>::complete_err(
+                    ctx,
+                    "Unknown error".to_string(),
+                );
+            };
         }
-    } else {
-        // SAFETY: ctx is a valid pointer to AsyncCompletion<Vec<NotificationCategory>> created by AsyncCompletion::create().
-        unsafe {
-            AsyncCompletion::<Vec<NotificationCategory>>::complete_err(
-                ctx,
-                "Unknown error".to_string(),
-            );
-        };
-    }
+    });
 }
 
 /// Future returned by async category queries on `UNUserNotificationCenter`.
@@ -299,37 +310,42 @@ impl Future for GetCategoriesFuture {
 
 extern "C" fn get_settings_callback(result: *const c_void, error: *const i8, ctx: *mut c_void) {
     use std::ffi::c_char;
-    if !error.is_null() {
-        // SAFETY: error is a valid C-string pointer passed from Swift FFI bridge.
-        let msg = unsafe { error_from_cstr(error) };
-        // SAFETY: ctx is a valid pointer to AsyncCompletion<NotificationSettings> created by AsyncCompletion::create().
-        unsafe { AsyncCompletion::<NotificationSettings>::complete_err(ctx, msg) };
-    } else if !result.is_null() {
-        // SAFETY: result is a valid pointer to a C-string JSON object passed from Swift FFI bridge.
-        let json_ptr = result as *mut c_char;
-        match decode_settings_json(json_ptr) {
-            Ok(settings) => {
-                // SAFETY: ctx is a valid pointer to AsyncCompletion<NotificationSettings> created by AsyncCompletion::create().
-                unsafe {
-                    AsyncCompletion::<NotificationSettings>::complete_ok(ctx, settings);
+    catch_user_panic("get_settings_callback", || {
+        if !error.is_null() {
+            // SAFETY: error is a valid C-string pointer passed from Swift FFI bridge.
+            let msg = unsafe { error_from_cstr(error) };
+            // SAFETY: ctx is a valid pointer to AsyncCompletion<NotificationSettings> created by AsyncCompletion::create().
+            unsafe { AsyncCompletion::<NotificationSettings>::complete_err(ctx, msg) };
+        } else if !result.is_null() {
+            // SAFETY: result is a valid pointer to a C-string JSON object passed from Swift FFI bridge.
+            let json_ptr = result as *mut c_char;
+            match decode_settings_json(json_ptr) {
+                Ok(settings) => {
+                    // SAFETY: ctx is a valid pointer to AsyncCompletion<NotificationSettings> created by AsyncCompletion::create().
+                    unsafe {
+                        AsyncCompletion::<NotificationSettings>::complete_ok(ctx, settings);
+                    }
+                }
+                Err(e) => {
+                    // SAFETY: ctx is a valid pointer to AsyncCompletion<NotificationSettings> created by AsyncCompletion::create().
+                    unsafe {
+                        AsyncCompletion::<NotificationSettings>::complete_err(
+                            ctx,
+                            e.message().to_string(),
+                        );
+                    }
                 }
             }
-            Err(e) => {
-                // SAFETY: ctx is a valid pointer to AsyncCompletion<NotificationSettings> created by AsyncCompletion::create().
-                unsafe {
-                    AsyncCompletion::<NotificationSettings>::complete_err(
-                        ctx,
-                        e.message().to_string(),
-                    );
-                }
-            }
+        } else {
+            // SAFETY: ctx is a valid pointer to AsyncCompletion<NotificationSettings> created by AsyncCompletion::create().
+            unsafe {
+                AsyncCompletion::<NotificationSettings>::complete_err(
+                    ctx,
+                    "Unknown error".to_string(),
+                );
+            };
         }
-    } else {
-        // SAFETY: ctx is a valid pointer to AsyncCompletion<NotificationSettings> created by AsyncCompletion::create().
-        unsafe {
-            AsyncCompletion::<NotificationSettings>::complete_err(ctx, "Unknown error".to_string());
-        };
-    }
+    });
 }
 
 /// Future returned by async settings queries on `UNUserNotificationCenter`.

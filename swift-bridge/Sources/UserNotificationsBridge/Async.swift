@@ -29,9 +29,13 @@ public func un_center_request_authorization_async(
             let granted = try await center.requestAuthorization(
                 options: UNAuthorizationOptions(rawValue: UInt(options))
             )
-            let boolValue = granted ? 1 as UInt8 : 0 as UInt8
-            let holder = Unmanaged.passRetained(NSNumber(value: boolValue))
-            callback(holder.toOpaque(), nil, context)
+            // The Rust callback reads a single byte from `result` and does not
+            // free it, so pass a pointer to a stack byte that is valid for the
+            // synchronous duration of the callback (no allocation, no leak).
+            var boolValue: UInt8 = granted ? 1 : 0
+            withUnsafePointer(to: &boolValue) {
+                callback(UnsafeRawPointer($0), nil, context)
+            }
         } catch {
             error.localizedDescription.withCString { callback(nil, $0, context) }
         }
@@ -87,8 +91,10 @@ public func un_center_get_delivered_notifications_async(
                 request: un_request_payload($0.request)
             ) }
             let jsonString = un_encode_json(payloads)
-            let holder = Unmanaged.passRetained(jsonString as NSString)
-            callback(holder.toOpaque(), nil, context)
+            // Rust takes ownership of this C string and frees it, matching the
+            // synchronous bridge's un_string/strdup convention.
+            let cString = un_string(jsonString)
+            callback(cString.map(UnsafeRawPointer.init), nil, context)
         } catch {
             error.localizedDescription.withCString { callback(nil, $0, context) }
         }
@@ -114,8 +120,10 @@ public func un_center_get_pending_notification_requests_async(
             let requests = try await center.pendingNotificationRequests()
             let payloads = requests.map { un_request_payload($0) }
             let jsonString = un_encode_json(payloads)
-            let holder = Unmanaged.passRetained(jsonString as NSString)
-            callback(holder.toOpaque(), nil, context)
+            // Rust takes ownership of this C string and frees it, matching the
+            // synchronous bridge's un_string/strdup convention.
+            let cString = un_string(jsonString)
+            callback(cString.map(UnsafeRawPointer.init), nil, context)
         } catch {
             error.localizedDescription.withCString { callback(nil, $0, context) }
         }
@@ -143,8 +151,10 @@ public func un_center_get_notification_categories_async(
                 .sorted { $0.identifier < $1.identifier }
                 .map { un_category_payload($0) }
             let jsonString = un_encode_json(payloads)
-            let holder = Unmanaged.passRetained(jsonString as NSString)
-            callback(holder.toOpaque(), nil, context)
+            // Rust takes ownership of this C string and frees it, matching the
+            // synchronous bridge's un_string/strdup convention.
+            let cString = un_string(jsonString)
+            callback(cString.map(UnsafeRawPointer.init), nil, context)
         } catch {
             error.localizedDescription.withCString { callback(nil, $0, context) }
         }
@@ -170,8 +180,10 @@ public func un_center_get_notification_settings_async(
             let settings = try await center.notificationSettings()
             let payload = un_settings_payload(settings)
             let jsonString = un_encode_json(payload)
-            let holder = Unmanaged.passRetained(jsonString as NSString)
-            callback(holder.toOpaque(), nil, context)
+            // Rust takes ownership of this C string and frees it, matching the
+            // synchronous bridge's un_string/strdup convention.
+            let cString = un_string(jsonString)
+            callback(cString.map(UnsafeRawPointer.init), nil, context)
         } catch {
             error.localizedDescription.withCString { callback(nil, $0, context) }
         }
