@@ -25,7 +25,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "doom-fish-utils"
-version = "0.3.1"
+version = "0.3.3"
 dependencies = [
  "crossbeam-queue",
  "futures-util",
@@ -164,7 +164,7 @@ checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
 
 [[package]]
 name = "usernotifications-rs"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "apple-cf",
  "doom-fish-utils",
