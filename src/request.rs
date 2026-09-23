@@ -79,6 +79,9 @@ impl From<NotificationRequestPayload> for NotificationRequest {
 pub(crate) fn encode_request_json(
     request: &NotificationRequest,
 ) -> Result<String, UserNotificationsError> {
+    if let Some(trigger) = &request.trigger {
+        trigger.validate()?;
+    }
     serde_json::to_string(&NotificationRequestPayload::from(request)).map_err(|error| {
         UserNotificationsError::FrameworkError(format!(
             "failed to encode notification request: {error}",

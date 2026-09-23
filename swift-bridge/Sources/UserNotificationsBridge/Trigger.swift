@@ -56,6 +56,11 @@ func un_make_trigger(_ payload: UNNotificationTriggerPayload?) throws -> UNNotif
                 NSLocalizedDescriptionKey: "time interval triggers require time_interval",
             ])
         }
+        guard timeInterval.isFinite, timeInterval > 0 else {
+            throw NSError(domain: "usernotifications-rs", code: Int(UNR_INVALID_ARGUMENT), userInfo: [
+                NSLocalizedDescriptionKey: "time interval triggers require a finite time_interval greater than 0 seconds",
+            ])
+        }
         if payload.repeats == true && timeInterval < 60 {
             throw NSError(domain: "usernotifications-rs", code: Int(UNR_INVALID_ARGUMENT), userInfo: [
                 NSLocalizedDescriptionKey: "repeating time interval triggers must be at least 60 seconds",

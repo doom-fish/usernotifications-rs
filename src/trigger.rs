@@ -166,6 +166,23 @@ impl NotificationTrigger {
         Self::Push
     }
 
+    pub(crate) fn validate(&self) -> Result<(), UserNotificationsError> {
+        if let Self::TimeInterval(trigger) = self {
+            if !trigger.time_interval.is_finite() || trigger.time_interval <= 0.0 {
+                return Err(UserNotificationsError::InvalidArgument(
+                    "time interval triggers need a finite time_interval greater than 0 seconds"
+                        .into(),
+                ));
+            }
+            if trigger.repeats && trigger.time_interval < 60.0 {
+                return Err(UserNotificationsError::InvalidArgument(
+                    "repeating time interval triggers must be at least 60 seconds".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// Round-trips this trigger through the Swift bridge.
     pub fn bridge_roundtrip(&self) -> Result<Self, UserNotificationsError> {
         let trigger = encode_trigger_json(self)?;
@@ -264,6 +281,7 @@ impl From<NotificationTriggerPayload> for NotificationTrigger {
 pub(crate) fn encode_trigger_json(
     trigger: &NotificationTrigger,
 ) -> Result<String, UserNotificationsError> {
+    trigger.validate()?;
     serde_json::to_string(&NotificationTriggerPayload::from(trigger)).map_err(|error| {
         UserNotificationsError::FrameworkError(format!(
             "failed to encode notification trigger: {error}",
@@ -288,12 +306,54 @@ fn timestamp_from_system_time_opt(time: Option<&SystemTime>) -> Option<f64> {
 
 #[allow(clippy::single_option_map)]
 fn system_time_from_timestamp_opt(timestamp: Option<f64>) -> Option<SystemTime> {
-    timestamp.map(|timestamp| UNIX_EPOCH + Duration::from_secs_f64(timestamp.max(0.0)))
+    timestamp.and_then(|timestamp| {
+        Duration::try_from_secs_f64(timestamp.max(0.0))
+            .ok()
+            .and_then(|offset| UNIX_EPOCH.checked_add(offset))
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{CalendarTrigger, DateComponents, NotificationTrigger, TimeIntervalTrigger};
+    use super::{
+        encode_trigger_json, system_time_from_timestamp_opt, CalendarTrigger, DateComponents,
+        NotificationTrigger, TimeIntervalTrigger,
+    };
+    use crate::error::UserNotificationsError;
+
+    #[test]
+    fn time_interval_triggers_reject_intervals_the_framework_would_abort_on() {
+        for (seconds, repeats) in [
+            (0.0, false),
+            (-1.0, false),
+            (f64::NAN, false),
+            (f64::INFINITY, false),
+            (f64::NEG_INFINITY, false),
+            (59.9, true),
+        ] {
+            let trigger = NotificationTrigger::time_interval(seconds, repeats);
+            assert!(
+                matches!(
+                    encode_trigger_json(&trigger),
+                    Err(UserNotificationsError::InvalidArgument(_))
+                ),
+                "{seconds} s (repeats: {repeats}) must be rejected"
+            );
+        }
+        assert!(encode_trigger_json(&NotificationTrigger::time_interval(0.5, false)).is_ok());
+        assert!(encode_trigger_json(&NotificationTrigger::time_interval(60.0, true)).is_ok());
+    }
+
+    #[test]
+    fn out_of_range_trigger_dates_decode_without_panicking() {
+        assert_eq!(system_time_from_timestamp_opt(Some(f64::MAX)), None);
+        assert_eq!(
+            system_time_from_timestamp_opt(Some(f64::NAN)),
+            Some(std::time::UNIX_EPOCH)
+        );
+        assert!(system_time_from_timestamp_opt(Some(1_000.0)).is_some());
+        assert_eq!(system_time_from_timestamp_opt(None), None);
+    }
 
     #[test]
     fn date_components_round_trip_preserves_values() {

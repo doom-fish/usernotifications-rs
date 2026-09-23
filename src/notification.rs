@@ -38,7 +38,10 @@ impl From<&Notification> for NotificationPayload {
 impl From<NotificationPayload> for Notification {
     fn from(value: NotificationPayload) -> Self {
         Self {
-            date: UNIX_EPOCH + Duration::from_secs_f64(value.date.max(0.0)),
+            date: Duration::try_from_secs_f64(value.date.max(0.0))
+                .ok()
+                .and_then(|offset| UNIX_EPOCH.checked_add(offset))
+                .unwrap_or(UNIX_EPOCH),
             request: value.request.into(),
         }
     }
