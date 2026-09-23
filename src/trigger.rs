@@ -172,7 +172,7 @@ impl NotificationTrigger {
         let trigger = to_cstring(&trigger)?;
         let mut error = core::ptr::null_mut();
         let payload =
-            unsafe { ffi::trigger::un_trigger_roundtrip_json(trigger.as_ptr(), &mut error) };
+            unsafe { ffi::trigger::un_trigger_roundtrip_json(trigger.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {

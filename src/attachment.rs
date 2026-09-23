@@ -155,7 +155,7 @@ impl NotificationAttachment {
         let attachment = to_cstring(&attachment)?;
         let mut error = core::ptr::null_mut();
         let payload = unsafe {
-            ffi::attachment::un_attachment_roundtrip_json(attachment.as_ptr(), &mut error)
+            ffi::attachment::un_attachment_roundtrip_json(attachment.as_ptr(), &raw mut error)
         };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))

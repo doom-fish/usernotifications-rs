@@ -40,7 +40,7 @@ impl NotificationRequest {
         let request = to_cstring(&request)?;
         let mut error = core::ptr::null_mut();
         let payload =
-            unsafe { ffi::request::un_request_roundtrip_json(request.as_ptr(), &mut error) };
+            unsafe { ffi::request::un_request_roundtrip_json(request.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {

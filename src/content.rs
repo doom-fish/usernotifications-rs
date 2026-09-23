@@ -500,7 +500,7 @@ impl NotificationContent {
         let content = to_cstring(&content)?;
         let mut error = core::ptr::null_mut();
         let payload =
-            unsafe { ffi::content::un_content_roundtrip_json(content.as_ptr(), &mut error) };
+            unsafe { ffi::content::un_content_roundtrip_json(content.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
@@ -522,7 +522,7 @@ impl NotificationContent {
             ffi::content::un_content_updating_with_provider_json(
                 content.as_ptr(),
                 provider.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {

@@ -189,8 +189,8 @@ impl NotificationServiceExtensionSimulator {
                         as ffi::service_extension::ServiceExtensionExpireCallback,
                 ),
                 user_info,
-                &mut raw,
-                &mut error,
+                &raw mut raw,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK {
@@ -215,7 +215,7 @@ impl NotificationServiceExtensionSimulator {
             ffi::service_extension::un_service_extension_simulator_receive_request_json(
                 self.raw,
                 request.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if payload.is_null() {

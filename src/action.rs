@@ -137,7 +137,7 @@ impl NotificationAction {
         let action = encode_action_json(self)?;
         let action = to_cstring(&action)?;
         let mut error = core::ptr::null_mut();
-        let payload = unsafe { ffi::action::un_action_roundtrip_json(action.as_ptr(), &mut error) };
+        let payload = unsafe { ffi::action::un_action_roundtrip_json(action.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {

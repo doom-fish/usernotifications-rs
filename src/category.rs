@@ -111,7 +111,7 @@ impl NotificationCategory {
         let category = to_cstring(&category)?;
         let mut error = core::ptr::null_mut();
         let payload =
-            unsafe { ffi::category::un_category_roundtrip_json(category.as_ptr(), &mut error) };
+            unsafe { ffi::category::un_category_roundtrip_json(category.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {

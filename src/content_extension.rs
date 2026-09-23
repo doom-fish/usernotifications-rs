@@ -326,7 +326,7 @@ impl NotificationContentExtensionContext {
     pub fn new() -> Result<Self, UserNotificationsError> {
         let mut raw = core::ptr::null_mut();
         let status =
-            unsafe { ffi::content_extension::un_content_extension_context_create(&mut raw) };
+            unsafe { ffi::content_extension::un_content_extension_context_create(&raw mut raw) };
         if status == ffi::status::OK {
             Ok(Self { raw })
         } else {
@@ -356,7 +356,7 @@ impl NotificationContentExtensionContext {
             ffi::content_extension::un_content_extension_context_set_notification_actions(
                 self.raw,
                 json.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK {
@@ -371,7 +371,7 @@ impl NotificationContentExtensionContext {
         let mut error = core::ptr::null_mut();
         let payload = unsafe {
             ffi::content_extension::un_content_extension_context_get_notification_actions_json(
-                self.raw, &mut error,
+                self.raw, &raw mut error,
             )
         };
         if payload.is_null() {
@@ -455,8 +455,8 @@ impl NotificationContentExtensionSimulator {
                         as ffi::content_extension::ContentExtensionSimpleCallback,
                 ),
                 user_info,
-                &mut raw,
-                &mut error,
+                &raw mut raw,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK {
@@ -517,10 +517,10 @@ impl NotificationContentExtensionSimulator {
         unsafe {
             ffi::content_extension::un_content_extension_simulator_get_media_play_pause_button_frame(
                 self.raw,
-                &mut x,
-                &mut y,
-                &mut width,
-                &mut height,
+                &raw mut x,
+                &raw mut y,
+                &raw mut width,
+                &raw mut height,
             );
         }
         NotificationContentExtensionRect::new(x, y, width, height)
@@ -554,10 +554,10 @@ impl NotificationContentExtensionSimulator {
         let present = unsafe {
             ffi::content_extension::un_content_extension_simulator_get_media_play_pause_button_tint_color(
                 self.raw,
-                &mut red,
-                &mut green,
-                &mut blue,
-                &mut alpha,
+                &raw mut red,
+                &raw mut green,
+                &raw mut blue,
+                &raw mut alpha,
             )
         };
         present.then(|| NotificationContentExtensionTintColor::new(red, green, blue, alpha))
@@ -575,7 +575,7 @@ impl NotificationContentExtensionSimulator {
             ffi::content_extension::un_content_extension_simulator_receive_notification_json(
                 self.raw,
                 notification.as_ptr(),
-                &mut error,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK {
@@ -598,8 +598,8 @@ impl NotificationContentExtensionSimulator {
             ffi::content_extension::un_content_extension_simulator_receive_response_json(
                 self.raw,
                 response.as_ptr(),
-                &mut option,
-                &mut error,
+                &raw mut option,
+                &raw mut error,
             )
         };
         if status == ffi::status::OK {
