@@ -107,6 +107,9 @@ impl NotificationAttachmentOptions {
 }
 
 /// Wraps `UNNotificationAttachment`.
+///
+/// Adding a request that carries the attachment moves the file into the
+/// system's attachment data store; the file at `file_path` is gone afterwards.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NotificationAttachment {
     /// The identifier.

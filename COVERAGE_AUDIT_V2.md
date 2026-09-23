@@ -1,5 +1,7 @@
 # usernotifications-rs coverage audit v2 (vs MacOSX26.2.sdk)
 
+> Scope: generated against MacOSX26.2.sdk, which is no longer the installed SDK, and not regenerated since. The counts are top-level declarations (classes, protocols, enums, constants) after dropping everything unavailable on macOS, not methods or properties, so VERIFIED means "a wrapper type exists for this symbol". `UNNotificationServiceExtension` is counted through its simulator, and `UserNotificationsUI` (content extensions) isn't part of these counts.
+
 SDK_PUBLIC_SYMBOLS: 41
 VERIFIED: 41
 GAPS: 0

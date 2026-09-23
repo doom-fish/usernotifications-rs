@@ -397,6 +397,10 @@ impl UserNotificationCenter {
     }
 
     /// Schedules a notification request.
+    ///
+    /// Once the request is validated, `UserNotifications` moves every attachment
+    /// file into its own data store, so the files no longer exist at their
+    /// original paths. Pass copies of files you need to keep.
     pub fn add_notification_request(
         &self,
         request: &NotificationRequest,

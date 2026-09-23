@@ -397,6 +397,10 @@ impl AsyncUserNotificationCenter {
 
     /// Add a notification request asynchronously
     ///
+    /// Once the request is validated, `UserNotifications` moves every attachment
+    /// file into its own data store, so the files no longer exist at their
+    /// original paths. Pass copies of files you need to keep.
+    ///
     /// # Errors
     ///
     /// Returns an error if the request cannot be added.
