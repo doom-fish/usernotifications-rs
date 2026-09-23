@@ -1,3 +1,5 @@
+mod common;
+
 use usernotifications::prelude::*;
 
 #[test]
@@ -14,7 +16,16 @@ fn current_center_requires_app_bundle() {
 
 #[test]
 fn callbacks_builder_supports_will_present() {
-    let _callbacks = UserNotificationCenterCallbacks::new().on_will_present(|_| {
+    let mut callbacks = UserNotificationCenterCallbacks::new().on_will_present(|_| {
         NotificationPresentationOptions::BANNER | NotificationPresentationOptions::SOUND
     });
+    assert_eq!(
+        callbacks.will_present_notification(common::sample_notification()),
+        NotificationPresentationOptions::BANNER | NotificationPresentationOptions::SOUND
+    );
+    assert_eq!(
+        UserNotificationCenterCallbacks::new()
+            .will_present_notification(common::sample_notification()),
+        NotificationPresentationOptions::NONE
+    );
 }
