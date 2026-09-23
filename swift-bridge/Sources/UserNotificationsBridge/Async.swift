@@ -9,9 +9,14 @@ public typealias UNAsyncCallback = @convention(c) (
     UnsafeRawPointer?, UnsafePointer<CChar>?, UnsafeMutableRawPointer
 ) -> Void
 
+private func un_async_unavailable(_ callback: UNAsyncCallback, _ context: UnsafeMutableRawPointer) {
+    "the async UserNotifications API requires macOS 12 or newer".withCString {
+        callback(nil, $0, context)
+    }
+}
+
 // MARK: - Authorization Request
 
-@available(macOS 12, *)
 @_cdecl("un_center_request_authorization_async")
 public func un_center_request_authorization_async(
     _ centerPtr: UnsafeMutableRawPointer?,
@@ -19,6 +24,10 @@ public func un_center_request_authorization_async(
     _ callback: UNAsyncCallback,
     _ context: UnsafeMutableRawPointer
 ) {
+    guard #available(macOS 12, *) else {
+        un_async_unavailable(callback, context)
+        return
+    }
     guard let center = un_center_unwrap(centerPtr) else {
         "notification center must not be null".withCString { callback(nil, $0, context) }
         return
@@ -44,7 +53,6 @@ public func un_center_request_authorization_async(
 
 // MARK: - Add Notification Request
 
-@available(macOS 12, *)
 @_cdecl("un_center_add_notification_request_async")
 public func un_center_add_notification_request_async(
     _ centerPtr: UnsafeMutableRawPointer?,
@@ -52,6 +60,10 @@ public func un_center_add_notification_request_async(
     _ callback: UNAsyncCallback,
     _ context: UnsafeMutableRawPointer
 ) {
+    guard #available(macOS 12, *) else {
+        un_async_unavailable(callback, context)
+        return
+    }
     guard let center = un_center_unwrap(centerPtr) else {
         "notification center must not be null".withCString { callback(nil, $0, context) }
         return
@@ -78,13 +90,16 @@ public func un_center_add_notification_request_async(
 
 // MARK: - Get Delivered Notifications
 
-@available(macOS 12, *)
 @_cdecl("un_center_get_delivered_notifications_async")
 public func un_center_get_delivered_notifications_async(
     _ centerPtr: UnsafeMutableRawPointer?,
     _ callback: UNAsyncCallback,
     _ context: UnsafeMutableRawPointer
 ) {
+    guard #available(macOS 12, *) else {
+        un_async_unavailable(callback, context)
+        return
+    }
     guard let center = un_center_unwrap(centerPtr) else {
         "notification center must not be null".withCString { callback(nil, $0, context) }
         return
@@ -110,13 +125,16 @@ public func un_center_get_delivered_notifications_async(
 
 // MARK: - Get Pending Notification Requests
 
-@available(macOS 12, *)
 @_cdecl("un_center_get_pending_notification_requests_async")
 public func un_center_get_pending_notification_requests_async(
     _ centerPtr: UnsafeMutableRawPointer?,
     _ callback: UNAsyncCallback,
     _ context: UnsafeMutableRawPointer
 ) {
+    guard #available(macOS 12, *) else {
+        un_async_unavailable(callback, context)
+        return
+    }
     guard let center = un_center_unwrap(centerPtr) else {
         "notification center must not be null".withCString { callback(nil, $0, context) }
         return
@@ -139,13 +157,16 @@ public func un_center_get_pending_notification_requests_async(
 
 // MARK: - Get Notification Categories
 
-@available(macOS 12, *)
 @_cdecl("un_center_get_notification_categories_async")
 public func un_center_get_notification_categories_async(
     _ centerPtr: UnsafeMutableRawPointer?,
     _ callback: UNAsyncCallback,
     _ context: UnsafeMutableRawPointer
 ) {
+    guard #available(macOS 12, *) else {
+        un_async_unavailable(callback, context)
+        return
+    }
     guard let center = un_center_unwrap(centerPtr) else {
         "notification center must not be null".withCString { callback(nil, $0, context) }
         return
@@ -170,13 +191,16 @@ public func un_center_get_notification_categories_async(
 
 // MARK: - Get Notification Settings
 
-@available(macOS 12, *)
 @_cdecl("un_center_get_notification_settings_async")
 public func un_center_get_notification_settings_async(
     _ centerPtr: UnsafeMutableRawPointer?,
     _ callback: UNAsyncCallback,
     _ context: UnsafeMutableRawPointer
 ) {
+    guard #available(macOS 12, *) else {
+        un_async_unavailable(callback, context)
+        return
+    }
     guard let center = un_center_unwrap(centerPtr) else {
         "notification center must not be null".withCString { callback(nil, $0, context) }
         return
