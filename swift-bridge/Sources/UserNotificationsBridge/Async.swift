@@ -27,7 +27,7 @@ public func un_center_request_authorization_async(
     Task {
         do {
             let granted = try await center.requestAuthorization(
-                options: UNAuthorizationOptions(rawValue: UInt(options))
+                options: UNAuthorizationOptions(rawValue: UInt(truncatingIfNeeded: options))
             )
             // The Rust callback reads a single byte from `result` and does not
             // free it, so pass a pointer to a stack byte that is valid for the

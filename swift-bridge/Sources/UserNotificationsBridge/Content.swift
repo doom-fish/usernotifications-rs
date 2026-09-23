@@ -222,10 +222,10 @@ func un_make_content(_ payload: UNNotificationContentPayload) throws -> UNMutabl
         payload.localized_summary_argument,
         fallback: payload.summary_argument
     )
-    content.summaryArgumentCount = Int(payload.summary_argument_count)
+    content.summaryArgumentCount = Int(clamping: payload.summary_argument_count)
     if #available(macOS 12.0, *), let interruptionLevel = payload.interruption_level {
-        content.interruptionLevel = UNNotificationInterruptionLevel(rawValue: UInt(interruptionLevel))
-            ?? .active
+        content.interruptionLevel = UInt(exactly: interruptionLevel)
+            .flatMap(UNNotificationInterruptionLevel.init(rawValue:)) ?? .active
     }
     if #available(macOS 12.0, *), let relevanceScore = payload.relevance_score {
         content.relevanceScore = relevanceScore
@@ -271,10 +271,10 @@ func un_content_payload(
         sound: un_sound_payload(content.sound),
         attachments: encodedAttachments,
         summary_argument: content.summaryArgument,
-        summary_argument_count: UInt64(content.summaryArgumentCount),
+        summary_argument_count: UInt64(clamping: content.summaryArgumentCount),
         interruption_level: {
             if #available(macOS 12.0, *) {
-                return Int32(content.interruptionLevel.rawValue)
+                return Int32(clamping: content.interruptionLevel.rawValue)
             }
             return nil
         }(),

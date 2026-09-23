@@ -56,3 +56,12 @@ fn content_updating_from_attributed_message_context_smoke_tests() {
         Err(error) => panic!("content update should succeed: {error}"),
     }
 }
+
+#[test]
+fn huge_summary_argument_counts_are_clamped_instead_of_trapping() {
+    let content = NotificationContent::new("Title", "Body").with_summary_argument_count(u64::MAX);
+    let roundtrip = content
+        .bridge_roundtrip()
+        .expect("content with a huge summary argument count should roundtrip");
+    assert_eq!(roundtrip.summary_argument_count, i64::MAX.unsigned_abs());
+}
