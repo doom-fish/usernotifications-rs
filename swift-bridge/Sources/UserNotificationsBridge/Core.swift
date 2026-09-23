@@ -8,6 +8,8 @@ public let UNR_TIMED_OUT: Int32 = -3
 
 let UN_WAIT_SECONDS = 30
 
+public typealias UNContextCallback = @convention(c) (UnsafeMutableRawPointer?) -> Void
+
 struct UNCompletionOutcome {
     var granted = false
     var payload: String?

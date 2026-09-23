@@ -1,7 +1,7 @@
 use core::ffi::{c_char, c_void};
-use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Mutex;
 
+use doom_fish_utils::callback_context::CallbackContext;
 use serde::Deserialize;
 
 use crate::category::{decode_categories_json, encode_categories_json, NotificationCategory};
@@ -139,66 +139,68 @@ struct CallbackState {
     delegate: Mutex<Box<dyn UserNotificationCenterDelegate>>,
 }
 
+type CenterContext = CallbackContext<CallbackState>;
+
 /// Wraps `UNUserNotificationCenter`.
 pub struct UserNotificationCenter {
     raw: *mut c_void,
-    callback_state: Option<Box<CallbackState>>,
+    context: Option<CenterContext>,
 }
 
 unsafe impl Send for UserNotificationCenter {}
 unsafe impl Sync for UserNotificationCenter {}
 
-extern "C" fn center_event_trampoline(user_info: *mut c_void, event_json: *const c_char) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if user_info.is_null() || event_json.is_null() {
-            return;
-        }
+extern "C" fn center_event_trampoline(context: *mut c_void, event_json: *const c_char) {
+    if event_json.is_null() {
+        return;
+    }
+    let json = unsafe { std::ffi::CStr::from_ptr(event_json) }.to_string_lossy();
+    let _ = unsafe {
+        CenterContext::with(context, "UserNotificationCenterDelegate", |state| {
+            let Ok(payload) = serde_json::from_str::<CenterEventPayload>(&json) else {
+                return;
+            };
 
-        let state = unsafe { &*(user_info as *const CallbackState) };
-        let json = unsafe { std::ffi::CStr::from_ptr(event_json) }.to_string_lossy();
-        let Ok(payload) = serde_json::from_str::<CenterEventPayload>(&json) else {
-            return;
-        };
+            let Ok(mut delegate) = state.delegate.lock() else {
+                return;
+            };
 
-        let Ok(mut delegate) = state.delegate.lock() else {
-            return;
-        };
-
-        match payload.event.as_str() {
-            "didReceiveNotificationResponse" => {
-                if let Some(response) = payload.response {
-                    delegate.did_receive_notification_response(response.into());
+            match payload.event.as_str() {
+                "didReceiveNotificationResponse" => {
+                    if let Some(response) = payload.response {
+                        delegate.did_receive_notification_response(response.into());
+                    }
                 }
+                "openSettingsForNotification" => {
+                    delegate.open_settings_for_notification(payload.notification.map(Into::into));
+                }
+                _ => {}
             }
-            "openSettingsForNotification" => {
-                delegate.open_settings_for_notification(payload.notification.map(Into::into));
-            }
-            _ => {}
-        }
-    }));
+        })
+    };
 }
 
 extern "C" fn center_will_present_trampoline(
-    user_info: *mut c_void,
+    context: *mut c_void,
     notification_json: *const c_char,
 ) -> u64 {
-    catch_unwind(AssertUnwindSafe(|| {
-        if user_info.is_null() || notification_json.is_null() {
-            return NotificationPresentationOptions::NONE.bits();
-        }
+    if notification_json.is_null() {
+        return NotificationPresentationOptions::NONE.bits();
+    }
+    let json = unsafe { std::ffi::CStr::from_ptr(notification_json) }.to_string_lossy();
+    unsafe {
+        CenterContext::with(context, "UserNotificationCenterDelegate", |state| {
+            let Ok(payload) = serde_json::from_str::<NotificationPayload>(&json) else {
+                return NotificationPresentationOptions::NONE.bits();
+            };
 
-        let state = unsafe { &*(user_info as *const CallbackState) };
-        let json = unsafe { std::ffi::CStr::from_ptr(notification_json) }.to_string_lossy();
-        let Ok(payload) = serde_json::from_str::<NotificationPayload>(&json) else {
-            return NotificationPresentationOptions::NONE.bits();
-        };
+            let Ok(mut delegate) = state.delegate.lock() else {
+                return NotificationPresentationOptions::NONE.bits();
+            };
 
-        let Ok(mut delegate) = state.delegate.lock() else {
-            return NotificationPresentationOptions::NONE.bits();
-        };
-
-        delegate.will_present_notification(payload.into()).bits()
-    }))
+            delegate.will_present_notification(payload.into()).bits()
+        })
+    }
     .unwrap_or(NotificationPresentationOptions::NONE.bits())
 }
 
@@ -233,10 +235,7 @@ impl UserNotificationCenter {
             return Err(from_swift(status, error));
         }
 
-        let mut center = Self {
-            raw,
-            callback_state: None,
-        };
+        let mut center = Self { raw, context: None };
         if let Some(delegate) = delegate {
             center.set_boxed_delegate(delegate)?;
         }
@@ -263,37 +262,37 @@ impl UserNotificationCenter {
         &mut self,
         delegate: Box<dyn UserNotificationCenterDelegate>,
     ) -> Result<(), UserNotificationsError> {
-        let callback_state = Box::new(CallbackState {
+        let context = CenterContext::new(CallbackState {
             delegate: Mutex::new(delegate),
         });
-        let mut callback_state = Some(callback_state);
-        let user_info = callback_state
-            .as_deref_mut()
-            .map_or(core::ptr::null_mut(), |state| {
-                std::ptr::from_mut::<CallbackState>(state).cast::<c_void>()
-            });
         let mut error = core::ptr::null_mut();
         let status = unsafe {
             ffi::center::un_center_set_delegate(
                 self.raw,
                 Some(center_event_trampoline as ffi::center::CenterEventCallback),
                 Some(center_will_present_trampoline as ffi::center::CenterWillPresentCallback),
-                user_info,
+                context.as_ptr(),
+                Some(CenterContext::RETAIN),
+                Some(CenterContext::RELEASE),
                 &raw mut error,
             )
         };
         if status == ffi::status::OK {
-            self.callback_state = callback_state;
+            if let Some(previous) = self.context.replace(context) {
+                previous.deactivate();
+            }
             Ok(())
         } else {
             Err(from_swift(status, error))
         }
     }
 
-    /// Removes any installed delegate callbacks.
+    /// Removes the delegate callbacks installed through this instance.
     pub fn clear_delegate(&mut self) {
-        unsafe { ffi::center::un_center_clear_delegate(self.raw) };
-        self.callback_state = None;
+        if let Some(context) = self.context.take() {
+            context.deactivate();
+            unsafe { ffi::center::un_center_clear_delegate(self.raw) };
+        }
     }
 
     /// Requests notification authorization from the system.
@@ -492,9 +491,7 @@ impl UserNotificationCenter {
 
 impl Drop for UserNotificationCenter {
     fn drop(&mut self) {
-        if self.callback_state.is_some() {
-            unsafe { ffi::center::un_center_clear_delegate(self.raw) };
-        }
+        self.clear_delegate();
         unsafe { ffi::core::un_object_release(self.raw) };
     }
 }
@@ -504,4 +501,106 @@ fn encode_identifiers(identifiers: &[&str]) -> Result<std::ffi::CString, UserNot
         UserNotificationsError::FrameworkError(format!("failed to encode identifiers: {error}"))
     })?;
     to_cstring(&json)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::CString;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use std::time::UNIX_EPOCH;
+
+    use super::*;
+    use crate::content::NotificationContent;
+    use crate::notification::encode_notification_json;
+
+    fn sample_notification() -> Notification {
+        Notification {
+            date: UNIX_EPOCH,
+            request: NotificationRequest::new(
+                "request",
+                NotificationContent::new("Title", "Body"),
+                None,
+            ),
+        }
+    }
+
+    fn response_event_json() -> CString {
+        let response = NotificationResponse {
+            action_identifier: "reply".into(),
+            notification: sample_notification(),
+            user_text: Some("hello".into()),
+        };
+        let payload = serde_json::to_string(&NotificationResponsePayload::from(&response)).unwrap();
+        CString::new(format!(
+            "{{\"event\":\"didReceiveNotificationResponse\",\"notification\":null,\"response\":{payload}}}"
+        ))
+        .unwrap()
+    }
+
+    fn counting_context(responses: &Arc<AtomicUsize>) -> CenterContext {
+        let counter = Arc::clone(responses);
+        let callbacks = UserNotificationCenterCallbacks::new()
+            .on_will_present(|_| {
+                NotificationPresentationOptions::BANNER | NotificationPresentationOptions::SOUND
+            })
+            .on_response(move |response| {
+                assert_eq!(response.action_identifier, "reply");
+                assert_eq!(response.user_text.as_deref(), Some("hello"));
+                counter.fetch_add(1, Ordering::SeqCst);
+            });
+        CenterContext::new(CallbackState {
+            delegate: Mutex::new(Box::new(callbacks)),
+        })
+    }
+
+    #[test]
+    fn trampolines_reach_the_delegate_until_it_is_deactivated() {
+        let responses = Arc::new(AtomicUsize::new(0));
+        let context = counting_context(&responses);
+        let swift_reference = context.retained_ptr();
+        let event = response_event_json();
+        let notification =
+            CString::new(encode_notification_json(&sample_notification()).unwrap()).unwrap();
+
+        center_event_trampoline(swift_reference, event.as_ptr());
+        let presented = center_will_present_trampoline(swift_reference, notification.as_ptr());
+        assert_eq!(
+            presented,
+            (NotificationPresentationOptions::BANNER | NotificationPresentationOptions::SOUND)
+                .bits()
+        );
+        assert_eq!(responses.load(Ordering::SeqCst), 1);
+
+        context.deactivate();
+        center_event_trampoline(swift_reference, event.as_ptr());
+        assert_eq!(
+            center_will_present_trampoline(swift_reference, notification.as_ptr()),
+            NotificationPresentationOptions::NONE.bits()
+        );
+        assert_eq!(responses.load(Ordering::SeqCst), 1);
+
+        drop(context);
+        assert_eq!(Arc::strong_count(&responses), 2);
+        unsafe { (CenterContext::RELEASE)(swift_reference) };
+        assert_eq!(Arc::strong_count(&responses), 1);
+    }
+
+    #[test]
+    fn trampolines_ignore_null_and_malformed_payloads() {
+        let responses = Arc::new(AtomicUsize::new(0));
+        let context = counting_context(&responses);
+        let swift_reference = context.retained_ptr();
+
+        center_event_trampoline(swift_reference, core::ptr::null());
+        center_event_trampoline(swift_reference, c"not json".as_ptr());
+        center_event_trampoline(core::ptr::null_mut(), response_event_json().as_ptr());
+        assert_eq!(
+            center_will_present_trampoline(swift_reference, c"{}".as_ptr()),
+            NotificationPresentationOptions::NONE.bits()
+        );
+        assert_eq!(responses.load(Ordering::SeqCst), 0);
+
+        unsafe { (CenterContext::RELEASE)(swift_reference) };
+    }
 }

@@ -13,31 +13,82 @@ public typealias UNCenterEventCallback =
 public typealias UNCenterWillPresentCallback =
     @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> UInt64
 
-private final class UNRustCenterDelegate: NSObject, UNUserNotificationCenterDelegate {
-    let eventCallback: UNCenterEventCallback?
-    let willPresentCallback: UNCenterWillPresentCallback?
-    let userInfo: UnsafeMutableRawPointer?
-    private var isActive = true
+private final class UNDelegateRegistration: @unchecked Sendable {
+    private let eventCallback: UNCenterEventCallback?
+    private let willPresentCallback: UNCenterWillPresentCallback?
+    private let context: UnsafeMutableRawPointer
+    private let release: UNContextCallback
 
-    init(
+    init?(
         eventCallback: UNCenterEventCallback?,
         willPresentCallback: UNCenterWillPresentCallback?,
-        userInfo: UnsafeMutableRawPointer?
+        context: UnsafeMutableRawPointer?,
+        retain: UNContextCallback?,
+        release: UNContextCallback?
     ) {
+        guard let context, let retain, let release else {
+            return nil
+        }
         self.eventCallback = eventCallback
         self.willPresentCallback = willPresentCallback
-        self.userInfo = userInfo
-        super.init()
+        self.context = context
+        self.release = release
+        retain(context)
     }
 
-    func deactivate() {
-        isActive = false
+    deinit {
+        release(context)
     }
 
-    private func send(_ payload: UNCenterEventPayload) {
-        guard isActive, let eventCallback else { return }
-        let json = un_encode_json(payload)
-        json.withCString { eventCallback(userInfo, $0) }
+    func send(_ json: String) {
+        guard let eventCallback else { return }
+        json.withCString { eventCallback(context, $0) }
+    }
+
+    func willPresent(_ json: String) -> UInt64 {
+        guard let willPresentCallback else { return 0 }
+        return json.withCString { willPresentCallback(context, $0) }
+    }
+}
+
+private final class UNCenterDelegateMultiplexer: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = UNCenterDelegateMultiplexer()
+
+    private let lock = NSRecursiveLock()
+    private var registrations: [(token: UInt64, registration: UNDelegateRegistration)] = []
+    private var nextToken: UInt64 = 1
+
+    func register(
+        _ registration: UNDelegateRegistration,
+        on center: UNUserNotificationCenter
+    ) -> UInt64 {
+        lock.lock()
+        defer { lock.unlock() }
+        let token = nextToken
+        nextToken += 1
+        registrations.append((token, registration))
+        if center.delegate !== self {
+            center.delegate = self
+        }
+        return token
+    }
+
+    func unregister(_ token: UInt64, on center: UNUserNotificationCenter) {
+        lock.lock()
+        let index = registrations.firstIndex { $0.token == token }
+        let removed = index.map { registrations.remove(at: $0).registration }
+        if registrations.isEmpty, center.delegate === self {
+            center.delegate = nil
+        }
+        withExtendedLifetime(removed) {
+            lock.unlock()
+        }
+    }
+
+    private func snapshot() -> [UNDelegateRegistration] {
+        lock.lock()
+        defer { lock.unlock() }
+        return registrations.map(\.registration)
     }
 
     func userNotificationCenter(
@@ -45,17 +96,9 @@ private final class UNRustCenterDelegate: NSObject, UNUserNotificationCenterDele
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        guard isActive else {
-            completionHandler([])
-            return
-        }
-        guard let willPresentCallback else {
-            completionHandler([])
-            return
-        }
         let json = un_encode_json(un_notification_payload(notification))
-        let bits = json.withCString { willPresentCallback(userInfo, $0) }
-        completionHandler(UNNotificationPresentationOptions(rawValue: UInt(bits)))
+        let bits = snapshot().reduce(UInt64(0)) { $0 | $1.willPresent(json) }
+        completionHandler(UNNotificationPresentationOptions(rawValue: UInt(truncatingIfNeeded: bits)))
     }
 
     func userNotificationCenter(
@@ -63,11 +106,12 @@ private final class UNRustCenterDelegate: NSObject, UNUserNotificationCenterDele
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        send(UNCenterEventPayload(
+        let json = un_encode_json(UNCenterEventPayload(
             event: "didReceiveNotificationResponse",
             notification: nil,
             response: un_response_payload(response)
         ))
+        snapshot().forEach { $0.send(json) }
         completionHandler()
     }
 
@@ -75,34 +119,39 @@ private final class UNRustCenterDelegate: NSObject, UNUserNotificationCenterDele
         _ center: UNUserNotificationCenter,
         openSettingsFor notification: UNNotification?
     ) {
-        send(UNCenterEventPayload(
+        let json = un_encode_json(UNCenterEventPayload(
             event: "openSettingsForNotification",
             notification: notification.map(un_notification_payload),
             response: nil
         ))
+        snapshot().forEach { $0.send(json) }
     }
 }
 
 private final class UNUserNotificationCenterBox: NSObject {
     let center: UNUserNotificationCenter
-    private var delegateBox: UNRustCenterDelegate?
+    private var delegateToken: UInt64?
 
-    init(center: UNUserNotificationCenter, delegateBox: UNRustCenterDelegate? = nil) {
+    init(center: UNUserNotificationCenter) {
         self.center = center
-        self.delegateBox = delegateBox
         super.init()
-        self.center.delegate = delegateBox
     }
 
-    func setDelegateBox(_ delegateBox: UNRustCenterDelegate?) {
-        self.delegateBox?.deactivate()
-        self.delegateBox = delegateBox
-        center.delegate = delegateBox
+    func setDelegate(_ registration: UNDelegateRegistration?) {
+        let newToken = registration.map {
+            UNCenterDelegateMultiplexer.shared.register($0, on: center)
+        }
+        let oldToken = delegateToken
+        delegateToken = newToken
+        if let oldToken {
+            UNCenterDelegateMultiplexer.shared.unregister(oldToken, on: center)
+        }
     }
 
     deinit {
-        delegateBox?.deactivate()
-        center.delegate = nil
+        if let delegateToken {
+            UNCenterDelegateMultiplexer.shared.unregister(delegateToken, on: center)
+        }
     }
 }
 
@@ -151,26 +200,33 @@ public func un_center_set_delegate(
     _ centerPtr: UnsafeMutableRawPointer?,
     _ eventCallback: UNCenterEventCallback?,
     _ willPresentCallback: UNCenterWillPresentCallback?,
-    _ userInfo: UnsafeMutableRawPointer?,
+    _ context: UnsafeMutableRawPointer?,
+    _ contextRetain: UNContextCallback?,
+    _ contextRelease: UNContextCallback?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
     guard let box = un_center_box(centerPtr) else {
         un_write_error(errorOut, "notification center must not be null")
         return UNR_INVALID_ARGUMENT
     }
-
-    let delegateBox = UNRustCenterDelegate(
+    guard let registration = UNDelegateRegistration(
         eventCallback: eventCallback,
         willPresentCallback: willPresentCallback,
-        userInfo: userInfo
-    )
-    box.setDelegateBox(delegateBox)
+        context: context,
+        retain: contextRetain,
+        release: contextRelease
+    ) else {
+        un_write_error(errorOut, "delegate context and its retain/release callbacks must not be null")
+        return UNR_INVALID_ARGUMENT
+    }
+
+    box.setDelegate(registration)
     return UNR_OK
 }
 
 @_cdecl("un_center_clear_delegate")
 public func un_center_clear_delegate(_ centerPtr: UnsafeMutableRawPointer?) {
-    un_center_box(centerPtr)?.setDelegateBox(nil)
+    un_center_box(centerPtr)?.setDelegate(nil)
 }
 
 @_cdecl("un_center_request_authorization")

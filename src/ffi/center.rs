@@ -2,6 +2,7 @@ use core::ffi::{c_char, c_void};
 
 pub type CenterEventCallback = unsafe extern "C" fn(*mut c_void, *const c_char);
 pub type CenterWillPresentCallback = unsafe extern "C" fn(*mut c_void, *const c_char) -> u64;
+pub type ContextCallback = unsafe extern "C" fn(*mut c_void);
 
 unsafe extern "C" {
     pub fn un_center_current(out_center: *mut *mut c_void, error_out: *mut *mut c_char) -> i32;
@@ -9,7 +10,9 @@ unsafe extern "C" {
         center: *mut c_void,
         event_callback: Option<CenterEventCallback>,
         will_present_callback: Option<CenterWillPresentCallback>,
-        user_info: *mut c_void,
+        context: *mut c_void,
+        context_retain: Option<ContextCallback>,
+        context_release: Option<ContextCallback>,
         error_out: *mut *mut c_char,
     ) -> i32;
     pub fn un_center_clear_delegate(center: *mut c_void);
