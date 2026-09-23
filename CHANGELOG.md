@@ -1,5 +1,72 @@
 # Changelog
 
+All notable changes to `usernotifications-rs` are documented here.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.4.0] - Unreleased
+
+### Security
+
+- The center delegate's callback state is no longer freed while
+  UserNotifications can still call it. It lives in a reference-counted
+  `CallbackContext`; each registration holds a reference, in-flight callbacks
+  keep theirs, and Rust deactivates the context before unregistering.
+- The async `add_notification_request` no longer reads the caller's request
+  JSON from a Swift task after the FFI call has returned (and the string was
+  freed); the request is built before the task starts.
+
+### Fixed
+
+- Dropping a temporary `UserNotificationCenter::current()` (or any other
+  value) no longer clears another value's delegate. One shared, refcounted
+  delegate object is installed on the process-wide center while any value has
+  a delegate, and each value only adds or removes its own registration.
+- A time-interval trigger with an interval of zero or less, a non-finite
+  interval, or a repeating interval under 60 seconds returns
+  `InvalidArgument` instead of raising an Objective-C exception that aborted
+  the process.
+- Blocking center calls and the service-extension simulator wait at most
+  30 seconds and return `UserNotificationsError::TimedOut`; completions write
+  into a lock-protected result.
+- A `summary_argument_count` above `i64::MAX` is clamped instead of trapping
+  in Swift, and other framework raw values are converted without trapping.
+- The async operations check for macOS 12 at run time and fail with an error
+  on older systems instead of running unguarded.
+- Out-of-range trigger and notification dates decode without panicking.
+- The callbacks-builder test asserts the will-present result.
+
+### Changed
+
+- **Breaking:** `UserNotificationCenter::clear_delegate` removes only the
+  delegate installed through that value. Responses and settings requests go
+  to every installed delegate, and the presentation options of all
+  `will_present_notification` implementations are combined.
+- **Breaking:** `ffi::center::un_center_set_delegate` takes context retain and
+  release callbacks; the settings, categories, pending-request and
+  delivered-notification ffi getters return a status and write their JSON to
+  an out-pointer.
+- `apple-cf` requirement is `>=0.11, <0.12` (sibling path dependency) and
+  `doom-fish-utils` is `>=0.4.1, <0.5`.
+- `rust-version` is 1.82.
+- `swift-bridge/.build` is no longer tracked in git.
+- The async authorization-request test is `#[ignore]`: from an app bundle it
+  would show a permission prompt.
+- README and COVERAGE explain the delegate model, timeouts and attachment
+  handling, require Xcode 16, and say what the coverage numbers measure.
+
+### Added
+
+- `UserNotificationsError::TimedOut` (status `-3`).
+- Docs on `add_notification_request` and `NotificationAttachment`: adding a
+  request moves its attachment files into the system's attachment store.
+
+## [0.3.7] - 2026-06-06
+
+- Async completion trampolines are panic-guarded, and an ObjC object is no
+  longer passed where the Rust side expected a C string.
+
 ## [0.3.6] - 2026-05-20
 
 - Clippy hygiene sweep: cleared all `-D warnings` lints across the crate. No public API change.
