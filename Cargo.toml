@@ -9,7 +9,7 @@ description = "Safe Rust bindings for Apple's UserNotifications and UserNotifica
 authors = ["Per Johansson <per@doom.fish>"]
 keywords = ["usernotifications", "notifications", "macos", "apple"]
 categories = ["api-bindings", "os::macos-apis"]
-rust-version = "1.76"
+rust-version = "1.82"
 readme = "README.md"
 build = "build.rs"
 include = [
@@ -37,8 +37,8 @@ name = "usernotifications"
 crate-type = ["lib"]
 
 [dependencies]
-apple-cf = { version = ">=0.4, <0.10", default-features = false }
-doom-fish-utils = { path = "../doom-fish-utils", version = ">=0.1, <0.4" }
+apple-cf = { path = "../apple-cf-rs", version = ">=0.11, <0.12", default-features = false }
+doom-fish-utils = { path = "../doom-fish-utils", version = ">=0.4.1, <0.5" }
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
