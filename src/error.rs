@@ -68,6 +68,7 @@ pub enum UserNotificationsError {
     InvalidArgument(String),
     /// Represents an error returned by the `UserNotifications` framework.
     FrameworkError(String),
+    TimedOut(String),
     /// Represents an unknown framework or bridge error code.
     Unknown {
         /// The raw error code.
@@ -84,6 +85,7 @@ impl UserNotificationsError {
         match self {
             Self::InvalidArgument(_) => ffi::status::INVALID_ARGUMENT,
             Self::FrameworkError(_) => ffi::status::FRAMEWORK_ERROR,
+            Self::TimedOut(_) => ffi::status::TIMED_OUT,
             Self::Unknown { code, .. } => *code,
         }
     }
@@ -94,6 +96,7 @@ impl UserNotificationsError {
         match self {
             Self::InvalidArgument(message)
             | Self::FrameworkError(message)
+            | Self::TimedOut(message)
             | Self::Unknown { message, .. } => message,
         }
     }
@@ -127,6 +130,7 @@ pub(crate) fn from_status_message(status: i32, message: String) -> UserNotificat
     match status {
         ffi::status::INVALID_ARGUMENT => UserNotificationsError::InvalidArgument(message),
         ffi::status::FRAMEWORK_ERROR => UserNotificationsError::FrameworkError(message),
+        ffi::status::TIMED_OUT => UserNotificationsError::TimedOut(message),
         code => UserNotificationsError::Unknown { code, message },
     }
 }
@@ -215,6 +219,14 @@ mod tests {
         assert_eq!(
             from_status_message(ffi::status::FRAMEWORK_ERROR, "bridge failed".into()),
             UserNotificationsError::FrameworkError("bridge failed".into()),
+        );
+        assert_eq!(
+            from_status_message(ffi::status::TIMED_OUT, "no reply".into()),
+            UserNotificationsError::TimedOut("no reply".into()),
+        );
+        assert_eq!(
+            UserNotificationsError::TimedOut("no reply".into()).code(),
+            ffi::status::TIMED_OUT,
         );
         assert_eq!(
             from_status_message(77, "unknown".into()),

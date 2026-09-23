@@ -4,6 +4,40 @@ import UserNotifications
 public let UNR_OK: Int32 = 0
 public let UNR_INVALID_ARGUMENT: Int32 = -1
 public let UNR_FRAMEWORK_ERROR: Int32 = -2
+public let UNR_TIMED_OUT: Int32 = -3
+
+let UN_WAIT_SECONDS = 30
+
+struct UNCompletionOutcome {
+    var granted = false
+    var payload: String?
+    var error: Error?
+}
+
+final class UNCompletionResult: @unchecked Sendable {
+    private let lock = NSLock()
+    private let semaphore = DispatchSemaphore(value: 0)
+    private var outcome: UNCompletionOutcome?
+
+    func finish(_ value: UNCompletionOutcome) {
+        lock.lock()
+        let first = outcome == nil
+        if first {
+            outcome = value
+        }
+        lock.unlock()
+        if first {
+            semaphore.signal()
+        }
+    }
+
+    func wait() -> UNCompletionOutcome? {
+        _ = semaphore.wait(timeout: .now() + .seconds(UN_WAIT_SECONDS))
+        lock.lock()
+        defer { lock.unlock() }
+        return outcome
+    }
+}
 
 @inline(__always)
 public func un_retain<T: AnyObject>(_ object: T) -> UnsafeMutableRawPointer {

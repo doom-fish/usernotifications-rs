@@ -16,13 +16,15 @@ pub mod status {
     pub const OK: i32 = 0;
     pub const INVALID_ARGUMENT: i32 = -1;
     pub const FRAMEWORK_ERROR: i32 = -2;
+    pub const TIMED_OUT: i32 = -3;
 }
 
 unsafe extern "C" {
     pub fn un_center_get_notification_settings_json(
         center: *mut c_void,
+        out_json: *mut *mut c_char,
         error_out: *mut *mut c_char,
-    ) -> *mut c_char;
+    ) -> i32;
 }
 
 // Async FFI declarations

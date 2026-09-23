@@ -9,8 +9,9 @@ unsafe extern "C" {
     ) -> i32;
     pub fn un_center_get_notification_categories_json(
         center: *mut c_void,
+        out_json: *mut *mut c_char,
         error_out: *mut *mut c_char,
-    ) -> *mut c_char;
+    ) -> i32;
     pub fn un_category_roundtrip_json(
         category_json: *const c_char,
         error_out: *mut *mut c_char,

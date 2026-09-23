@@ -186,23 +186,34 @@ public func un_center_request_authorization(
         return UNR_INVALID_ARGUMENT
     }
 
-    let semaphore = DispatchSemaphore(value: 0)
-    var granted = false
-    var completionError: Error?
-
-    center.requestAuthorization(options: UNAuthorizationOptions(rawValue: UInt(options))) {
-        granted = $0
-        completionError = $1
-        semaphore.signal()
+    outGranted.pointee = false
+    let result = UNCompletionResult()
+    center.requestAuthorization(
+        options: UNAuthorizationOptions(rawValue: UInt(truncatingIfNeeded: options))
+    ) {
+        result.finish(UNCompletionOutcome(granted: $0, error: $1))
     }
-    semaphore.wait()
+    guard let outcome = result.wait() else {
+        un_write_error(
+            errorOut,
+            "timed out after \(UN_WAIT_SECONDS) s waiting for the notification permission prompt; authorization has not been decided yet"
+        )
+        return UNR_TIMED_OUT
+    }
 
-    outGranted.pointee = granted
-    if let completionError {
-        un_write_error(errorOut, error: completionError)
+    outGranted.pointee = outcome.granted
+    if let error = outcome.error {
+        un_write_error(errorOut, error: error)
         return UNR_FRAMEWORK_ERROR
     }
     return UNR_OK
+}
+
+private func un_write_timeout(
+    _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
+    _ operation: String
+) {
+    un_write_error(errorOut, "timed out after \(UN_WAIT_SECONDS) s waiting for \(operation)")
 }
 
 @_cdecl("un_center_supports_content_extensions")
@@ -225,16 +236,17 @@ public func un_center_set_badge_count(
         return UNR_FRAMEWORK_ERROR
     }
 
-    let semaphore = DispatchSemaphore(value: 0)
-    var completionError: Error?
+    let result = UNCompletionResult()
     center.setBadgeCount(newBadgeCount) {
-        completionError = $0
-        semaphore.signal()
+        result.finish(UNCompletionOutcome(error: $0))
     }
-    semaphore.wait()
+    guard let outcome = result.wait() else {
+        un_write_timeout(errorOut, "setBadgeCount")
+        return UNR_TIMED_OUT
+    }
 
-    if let completionError {
-        un_write_error(errorOut, error: completionError)
+    if let error = outcome.error {
+        un_write_error(errorOut, error: error)
         return UNR_FRAMEWORK_ERROR
     }
     return UNR_OK
@@ -243,22 +255,25 @@ public func un_center_set_badge_count(
 @_cdecl("un_center_get_notification_settings_json")
 public func un_center_get_notification_settings_json(
     _ centerPtr: UnsafeMutableRawPointer?,
+    _ outJSON: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> UnsafeMutablePointer<CChar>? {
+) -> Int32 {
+    outJSON?.pointee = nil
     guard let center = un_center_box(centerPtr)?.center else {
         un_write_error(errorOut, "notification center must not be null")
-        return nil
+        return UNR_INVALID_ARGUMENT
     }
 
-    let semaphore = DispatchSemaphore(value: 0)
-    var payload: UNNotificationSettingsPayload?
+    let result = UNCompletionResult()
     center.getNotificationSettings {
-        payload = un_settings_payload($0)
-        semaphore.signal()
+        result.finish(UNCompletionOutcome(payload: un_encode_json(un_settings_payload($0))))
     }
-    semaphore.wait()
-
-    return payload.map(un_encode_json).flatMap(un_string)
+    guard let payload = result.wait()?.payload else {
+        un_write_timeout(errorOut, "the notification settings")
+        return UNR_TIMED_OUT
+    }
+    outJSON?.pointee = un_string(payload)
+    return UNR_OK
 }
 
 @_cdecl("un_center_set_notification_categories")
@@ -285,23 +300,28 @@ public func un_center_set_notification_categories(
 @_cdecl("un_center_get_notification_categories_json")
 public func un_center_get_notification_categories_json(
     _ centerPtr: UnsafeMutableRawPointer?,
+    _ outJSON: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> UnsafeMutablePointer<CChar>? {
+) -> Int32 {
+    outJSON?.pointee = nil
     guard let center = un_center_box(centerPtr)?.center else {
         un_write_error(errorOut, "notification center must not be null")
-        return nil
+        return UNR_INVALID_ARGUMENT
     }
 
-    let semaphore = DispatchSemaphore(value: 0)
-    var payloads: [UNNotificationCategoryPayload] = []
+    let result = UNCompletionResult()
     center.getNotificationCategories {
-        payloads = Array($0)
+        let payloads = Array($0)
             .sorted { $0.identifier < $1.identifier }
             .map { un_category_payload($0) }
-        semaphore.signal()
+        result.finish(UNCompletionOutcome(payload: un_encode_json(payloads)))
     }
-    semaphore.wait()
-    return un_string(un_encode_json(payloads))
+    guard let payload = result.wait()?.payload else {
+        un_write_timeout(errorOut, "the notification categories")
+        return UNR_TIMED_OUT
+    }
+    outJSON?.pointee = un_string(payload)
+    return UNR_OK
 }
 
 @_cdecl("un_center_add_request")
@@ -318,15 +338,16 @@ public func un_center_add_request(
     do {
         let payload = try un_decode_json(requestJSON, as: UNNotificationRequestPayload.self)
         let request = try un_make_request(payload)
-        let semaphore = DispatchSemaphore(value: 0)
-        var completionError: Error?
+        let result = UNCompletionResult()
         center.add(request) {
-            completionError = $0
-            semaphore.signal()
+            result.finish(UNCompletionOutcome(error: $0))
         }
-        semaphore.wait()
-        if let completionError {
-            un_write_error(errorOut, error: completionError)
+        guard let outcome = result.wait() else {
+            un_write_timeout(errorOut, "the notification request to be added")
+            return UNR_TIMED_OUT
+        }
+        if let error = outcome.error {
+            un_write_error(errorOut, error: error)
             return UNR_FRAMEWORK_ERROR
         }
         return UNR_OK
@@ -339,23 +360,28 @@ public func un_center_add_request(
 @_cdecl("un_center_get_pending_requests_json")
 public func un_center_get_pending_requests_json(
     _ centerPtr: UnsafeMutableRawPointer?,
+    _ outJSON: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> UnsafeMutablePointer<CChar>? {
+) -> Int32 {
+    outJSON?.pointee = nil
     guard let center = un_center_box(centerPtr)?.center else {
         un_write_error(errorOut, "notification center must not be null")
-        return nil
+        return UNR_INVALID_ARGUMENT
     }
 
-    let semaphore = DispatchSemaphore(value: 0)
-    var payloads: [UNNotificationRequestPayload] = []
+    let result = UNCompletionResult()
     center.getPendingNotificationRequests {
-        payloads = $0
+        let payloads = $0
             .sorted { $0.identifier < $1.identifier }
             .map { un_request_payload($0) }
-        semaphore.signal()
+        result.finish(UNCompletionOutcome(payload: un_encode_json(payloads)))
     }
-    semaphore.wait()
-    return un_string(un_encode_json(payloads))
+    guard let payload = result.wait()?.payload else {
+        un_write_timeout(errorOut, "the pending notification requests")
+        return UNR_TIMED_OUT
+    }
+    outJSON?.pointee = un_string(payload)
+    return UNR_OK
 }
 
 @_cdecl("un_center_remove_pending_requests")
@@ -380,23 +406,28 @@ public func un_center_remove_all_pending_requests(_ centerPtr: UnsafeMutableRawP
 @_cdecl("un_center_get_delivered_notifications_json")
 public func un_center_get_delivered_notifications_json(
     _ centerPtr: UnsafeMutableRawPointer?,
+    _ outJSON: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> UnsafeMutablePointer<CChar>? {
+) -> Int32 {
+    outJSON?.pointee = nil
     guard let center = un_center_box(centerPtr)?.center else {
         un_write_error(errorOut, "notification center must not be null")
-        return nil
+        return UNR_INVALID_ARGUMENT
     }
 
-    let semaphore = DispatchSemaphore(value: 0)
-    var payloads: [UNNotificationPayload] = []
+    let result = UNCompletionResult()
     center.getDeliveredNotifications {
-        payloads = $0
+        let payloads = $0
             .sorted { $0.request.identifier < $1.request.identifier }
             .map(un_notification_payload)
-        semaphore.signal()
+        result.finish(UNCompletionOutcome(payload: un_encode_json(payloads)))
     }
-    semaphore.wait()
-    return un_string(un_encode_json(payloads))
+    guard let payload = result.wait()?.payload else {
+        un_write_timeout(errorOut, "the delivered notifications")
+        return UNR_TIMED_OUT
+    }
+    outJSON?.pointee = un_string(payload)
+    return UNR_OK
 }
 
 @_cdecl("un_center_remove_delivered_notifications")

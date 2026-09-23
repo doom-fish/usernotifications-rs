@@ -117,12 +117,18 @@ public func un_service_extension_simulator_receive_request_json(
         simulator.pendingErrorMessage = nil
         simulator.lastDeliveredContent = nil
 
-        let semaphore = DispatchSemaphore(value: 0)
+        let result = UNCompletionResult()
         simulator.didReceive(request) { deliveredContent in
             simulator.lastDeliveredContent = deliveredContent
-            semaphore.signal()
+            result.finish(UNCompletionOutcome())
         }
-        semaphore.wait()
+        guard result.wait() != nil else {
+            un_write_error(
+                errorOut,
+                "timed out after \(UN_WAIT_SECONDS) s waiting for the service extension content handler"
+            )
+            return nil
+        }
 
         if let pendingErrorMessage = simulator.pendingErrorMessage {
             simulator.pendingErrorMessage = nil

@@ -339,13 +339,19 @@ impl UserNotificationCenter {
 
     /// Returns the current notification settings.
     pub fn notification_settings(&self) -> Result<NotificationSettings, UserNotificationsError> {
+        let mut payload = core::ptr::null_mut();
         let mut error = core::ptr::null_mut();
-        let payload =
-            unsafe { ffi::un_center_get_notification_settings_json(self.raw, &raw mut error) };
-        if payload.is_null() {
-            Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
-        } else {
+        let status = unsafe {
+            ffi::un_center_get_notification_settings_json(
+                self.raw,
+                &raw mut payload,
+                &raw mut error,
+            )
+        };
+        if status == ffi::status::OK {
             decode_settings_json(payload)
+        } else {
+            Err(from_swift(status, error))
         }
     }
 
@@ -375,14 +381,19 @@ impl UserNotificationCenter {
     pub fn notification_categories(
         &self,
     ) -> Result<Vec<NotificationCategory>, UserNotificationsError> {
+        let mut payload = core::ptr::null_mut();
         let mut error = core::ptr::null_mut();
-        let payload = unsafe {
-            ffi::category::un_center_get_notification_categories_json(self.raw, &raw mut error)
+        let status = unsafe {
+            ffi::category::un_center_get_notification_categories_json(
+                self.raw,
+                &raw mut payload,
+                &raw mut error,
+            )
         };
-        if payload.is_null() {
-            Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
-        } else {
+        if status == ffi::status::OK {
             decode_categories_json(payload)
+        } else {
+            Err(from_swift(status, error))
         }
     }
 
@@ -407,13 +418,19 @@ impl UserNotificationCenter {
     pub fn pending_notification_requests(
         &self,
     ) -> Result<Vec<NotificationRequest>, UserNotificationsError> {
+        let mut payload = core::ptr::null_mut();
         let mut error = core::ptr::null_mut();
-        let payload =
-            unsafe { ffi::request::un_center_get_pending_requests_json(self.raw, &raw mut error) };
-        if payload.is_null() {
-            Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
-        } else {
+        let status = unsafe {
+            ffi::request::un_center_get_pending_requests_json(
+                self.raw,
+                &raw mut payload,
+                &raw mut error,
+            )
+        };
+        if status == ffi::status::OK {
             decode_requests_json(payload)
+        } else {
+            Err(from_swift(status, error))
         }
     }
 
@@ -434,14 +451,19 @@ impl UserNotificationCenter {
 
     /// Returns delivered notifications.
     pub fn delivered_notifications(&self) -> Result<Vec<Notification>, UserNotificationsError> {
+        let mut payload = core::ptr::null_mut();
         let mut error = core::ptr::null_mut();
-        let payload = unsafe {
-            ffi::response::un_center_get_delivered_notifications_json(self.raw, &raw mut error)
+        let status = unsafe {
+            ffi::response::un_center_get_delivered_notifications_json(
+                self.raw,
+                &raw mut payload,
+                &raw mut error,
+            )
         };
-        if payload.is_null() {
-            Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
-        } else {
+        if status == ffi::status::OK {
             decode_notifications_json(payload)
+        } else {
+            Err(from_swift(status, error))
         }
     }
 
