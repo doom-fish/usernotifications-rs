@@ -18,6 +18,7 @@ fn current_center_or_skip() -> Option<UserNotificationCenter> {
 }
 
 #[test]
+#[ignore = "requests notification authorization, which shows a permission prompt and can change the user's notification settings when run from an app bundle"]
 fn test_async_authorization_request() {
     pollster::block_on(async {
         let Some(center) = current_center_or_skip() else {
