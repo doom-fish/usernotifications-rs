@@ -56,11 +56,18 @@ public func un_center_add_notification_request_async(
         "notification center must not be null".withCString { callback(nil, $0, context) }
         return
     }
+    let request: UNNotificationRequest
+    do {
+        request = try un_make_request(
+            un_decode_json(requestJson, as: UNNotificationRequestPayload.self)
+        )
+    } catch {
+        error.localizedDescription.withCString { callback(nil, $0, context) }
+        return
+    }
 
     Task {
         do {
-            let payload = try un_decode_json(requestJson, as: UNNotificationRequestPayload.self)
-            let request = try un_make_request(payload)
             try await center.add(request)
             callback(nil, nil, context)
         } catch {
