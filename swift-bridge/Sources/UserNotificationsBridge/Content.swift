@@ -223,11 +223,11 @@ func un_make_content(_ payload: UNNotificationContentPayload) throws -> UNMutabl
         fallback: payload.summary_argument
     )
     content.summaryArgumentCount = Int(clamping: payload.summary_argument_count)
-    if #available(macOS 12.0, *), let interruptionLevel = payload.interruption_level {
+    if let interruptionLevel = payload.interruption_level {
         content.interruptionLevel = UInt(exactly: interruptionLevel)
             .flatMap(UNNotificationInterruptionLevel.init(rawValue:)) ?? .active
     }
-    if #available(macOS 12.0, *), let relevanceScore = payload.relevance_score {
+    if let relevanceScore = payload.relevance_score {
         content.relevanceScore = relevanceScore
     }
     if #available(macOS 13.0, *), let filterCriteria = payload.filter_criteria {
@@ -272,18 +272,8 @@ func un_content_payload(
         attachments: encodedAttachments,
         summary_argument: content.summaryArgument,
         summary_argument_count: UInt64(clamping: content.summaryArgumentCount),
-        interruption_level: {
-            if #available(macOS 12.0, *) {
-                return Int32(clamping: content.interruptionLevel.rawValue)
-            }
-            return nil
-        }(),
-        relevance_score: {
-            if #available(macOS 12.0, *) {
-                return content.relevanceScore
-            }
-            return nil
-        }(),
+        interruption_level: Int32(clamping: content.interruptionLevel.rawValue),
+        relevance_score: content.relevanceScore,
         filter_criteria: {
             if #available(macOS 13.0, *) {
                 return content.filterCriteria

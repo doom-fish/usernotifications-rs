@@ -32,13 +32,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into a lock-protected result.
 - A `summary_argument_count` above `i64::MAX` is clamped instead of trapping
   in Swift, and other framework raw values are converted without trapping.
-- The async operations check for macOS 12 at run time and fail with an error
-  on older systems instead of running unguarded.
 - Out-of-range trigger and notification dates decode without panicking.
 - The callbacks-builder test asserts the will-present result.
+- `build.rs` no longer adds the toolchain's Swift 5.5 back-deployment
+  directory (`usr/lib/swift-5.5/macosx`) to the link search path or the
+  rpath. Its old `libswift_Concurrency.dylib` shadowed the SDK's
+  `libswift_Concurrency.tbd` in every binary that depends on this crate, so
+  linking failed next to a Swift bridge that uses newer concurrency APIs,
+  such as apple-localauthentication's.
 
 ### Changed
 
+- **Breaking:** the Swift bridge targets macOS 12 (was 10.14), so binaries
+  need macOS 12 or newer. Its async API uses Swift concurrency, which ran on
+  older systems without an availability check. The bridge's availability
+  checks for macOS 11 and 12 are gone, including the per-call macOS 12 checks
+  in the async API.
 - **Breaking:** `UserNotificationCenter::clear_delegate` removes only the
   delegate installed through that value. Responses and settings requests go
   to every installed delegate, and the presentation options of all

@@ -38,10 +38,6 @@ public func un_content_extension_context_set_notification_actions(
     _ actionsJSON: UnsafePointer<CChar>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
-    guard #available(macOS 11.0, *) else {
-        un_write_error(errorOut, "notification content extensions require macOS 11 or newer")
-        return UNR_FRAMEWORK_ERROR
-    }
     guard let box = un_content_extension_context_box(contextPtr) else {
         un_write_error(errorOut, "notification content extension context must not be null")
         return UNR_INVALID_ARGUMENT
@@ -62,10 +58,6 @@ public func un_content_extension_context_get_notification_actions_json(
     _ contextPtr: UnsafeMutableRawPointer?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutablePointer<CChar>? {
-    guard #available(macOS 11.0, *) else {
-        un_write_error(errorOut, "notification content extensions require macOS 11 or newer")
-        return nil
-    }
     guard let box = un_content_extension_context_box(contextPtr) else {
         un_write_error(errorOut, "notification content extension context must not be null")
         return nil
@@ -78,29 +70,28 @@ public func un_content_extension_context_get_notification_actions_json(
 public func un_content_extension_context_perform_default_action(
     _ contextPtr: UnsafeMutableRawPointer?
 ) {
-    guard #available(macOS 11.0, *), un_content_extension_context_box(contextPtr) != nil else { return }
+    guard un_content_extension_context_box(contextPtr) != nil else { return }
 }
 
 @_cdecl("un_content_extension_context_dismiss")
 public func un_content_extension_context_dismiss(_ contextPtr: UnsafeMutableRawPointer?) {
-    guard #available(macOS 11.0, *), un_content_extension_context_box(contextPtr) != nil else { return }
+    guard un_content_extension_context_box(contextPtr) != nil else { return }
 }
 
 @_cdecl("un_content_extension_context_media_playing_started")
 public func un_content_extension_context_media_playing_started(
     _ contextPtr: UnsafeMutableRawPointer?
 ) {
-    guard #available(macOS 11.0, *), un_content_extension_context_box(contextPtr) != nil else { return }
+    guard un_content_extension_context_box(contextPtr) != nil else { return }
 }
 
 @_cdecl("un_content_extension_context_media_playing_paused")
 public func un_content_extension_context_media_playing_paused(
     _ contextPtr: UnsafeMutableRawPointer?
 ) {
-    guard #available(macOS 11.0, *), un_content_extension_context_box(contextPtr) != nil else { return }
+    guard un_content_extension_context_box(contextPtr) != nil else { return }
 }
 
-@available(macOS 11.0, *)
 private final class UNRustNotificationContentExtensionHost: NSObject, UNNotificationContentExtension {
     let notificationCallback: UNContentExtensionNotificationCallback?
     let responseCallback: UNContentExtensionResponseCallback?
@@ -173,7 +164,6 @@ private final class UNRustNotificationContentExtensionHost: NSObject, UNNotifica
     }
 }
 
-@available(macOS 11.0, *)
 private func un_content_extension_host(
     _ ptr: UnsafeMutableRawPointer?
 ) -> UNRustNotificationContentExtensionHost? {
@@ -194,11 +184,6 @@ public func un_content_extension_simulator_create(
     _ outSimulator: UnsafeMutablePointer<UnsafeMutableRawPointer?>,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
-    guard #available(macOS 11.0, *) else {
-        un_write_error(errorOut, "notification content extensions require macOS 11 or newer")
-        outSimulator.pointee = nil
-        return UNR_FRAMEWORK_ERROR
-    }
     outSimulator.pointee = un_retain(UNRustNotificationContentExtensionHost(
         notificationCallback: notificationCallback,
         responseCallback: responseCallback,
@@ -214,7 +199,7 @@ public func un_content_extension_simulator_set_media_play_pause_button_type(
     _ simulatorPtr: UnsafeMutableRawPointer?,
     _ buttonType: UInt64
 ) {
-    guard #available(macOS 11.0, *), let host = un_content_extension_host(simulatorPtr) else {
+    guard let host = un_content_extension_host(simulatorPtr) else {
         return
     }
     host.storedButtonType = UNNotificationContentExtensionMediaPlayPauseButtonType(rawValue: UInt(buttonType))
@@ -225,9 +210,6 @@ public func un_content_extension_simulator_set_media_play_pause_button_type(
 public func un_content_extension_simulator_get_media_play_pause_button_type(
     _ simulatorPtr: UnsafeMutableRawPointer?
 ) -> UInt64 {
-    guard #available(macOS 11.0, *) else {
-        return 0
-    }
     return UInt64(un_content_extension_host(simulatorPtr)?.storedButtonType.rawValue ?? 0)
 }
 
@@ -239,9 +221,6 @@ public func un_content_extension_simulator_set_media_play_pause_button_frame(
     _ width: Double,
     _ height: Double
 ) {
-    guard #available(macOS 11.0, *) else {
-        return
-    }
     un_content_extension_host(simulatorPtr)?.storedButtonFrame = CGRect(
         x: x,
         y: y,
@@ -258,13 +237,6 @@ public func un_content_extension_simulator_get_media_play_pause_button_frame(
     _ width: UnsafeMutablePointer<Double>,
     _ height: UnsafeMutablePointer<Double>
 ) {
-    guard #available(macOS 11.0, *) else {
-        x.pointee = 0
-        y.pointee = 0
-        width.pointee = 0
-        height.pointee = 0
-        return
-    }
     let frame = un_content_extension_host(simulatorPtr)?.storedButtonFrame ?? .zero
     x.pointee = frame.origin.x
     y.pointee = frame.origin.y
@@ -280,9 +252,6 @@ public func un_content_extension_simulator_set_media_play_pause_button_tint_colo
     _ blue: Double,
     _ alpha: Double
 ) {
-    guard #available(macOS 11.0, *) else {
-        return
-    }
     un_content_extension_host(simulatorPtr)?.storedTintColor = NSColor(
         calibratedRed: red,
         green: green,
@@ -299,9 +268,7 @@ public func un_content_extension_simulator_get_media_play_pause_button_tint_colo
     _ blue: UnsafeMutablePointer<Double>,
     _ alpha: UnsafeMutablePointer<Double>
 ) -> Bool {
-    guard #available(macOS 11.0, *),
-          let color = un_content_extension_host(simulatorPtr)?.storedTintColor
-    else {
+    guard let color = un_content_extension_host(simulatorPtr)?.storedTintColor else {
         return false
     }
     let converted = color.usingColorSpace(.deviceRGB) ?? color
@@ -318,7 +285,7 @@ public func un_content_extension_simulator_receive_notification_json(
     _ notificationJSON: UnsafePointer<CChar>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
-    guard #available(macOS 11.0, *), let host = un_content_extension_host(simulatorPtr) else {
+    guard let host = un_content_extension_host(simulatorPtr) else {
         un_write_error(errorOut, "notification content extension simulator must not be null")
         return UNR_INVALID_ARGUMENT
     }
@@ -340,7 +307,7 @@ public func un_content_extension_simulator_receive_response_json(
     _ outOption: UnsafeMutablePointer<UInt64>,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
-    guard #available(macOS 11.0, *), let host = un_content_extension_host(simulatorPtr) else {
+    guard let host = un_content_extension_host(simulatorPtr) else {
         un_write_error(errorOut, "notification content extension simulator must not be null")
         return UNR_INVALID_ARGUMENT
     }
@@ -357,16 +324,10 @@ public func un_content_extension_simulator_receive_response_json(
 
 @_cdecl("un_content_extension_simulator_media_play")
 public func un_content_extension_simulator_media_play(_ simulatorPtr: UnsafeMutableRawPointer?) {
-    guard #available(macOS 11.0, *) else {
-        return
-    }
     un_content_extension_host(simulatorPtr)?.mediaPlay()
 }
 
 @_cdecl("un_content_extension_simulator_media_pause")
 public func un_content_extension_simulator_media_pause(_ simulatorPtr: UnsafeMutableRawPointer?) {
-    guard #available(macOS 11.0, *) else {
-        return
-    }
     un_content_extension_host(simulatorPtr)?.mediaPause()
 }

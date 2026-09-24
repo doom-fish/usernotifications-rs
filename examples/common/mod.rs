@@ -86,7 +86,7 @@ fn info_plist(executable_name: &str, bundle_identifier: &str) -> String {
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
-    <string>10.14</string>
+    <string>12.0</string>
 </dict>
 </plist>
 "#

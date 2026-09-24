@@ -18,7 +18,6 @@ struct UNNotificationActionPayload: Codable {
     var localized_text_input_placeholder: UNLocalizedStringPayload?
 }
 
-@available(macOS 12.0, *)
 func un_make_action_icon(_ payload: UNNotificationActionIconPayload?) -> UNNotificationActionIcon? {
     guard let payload else {
         return nil
@@ -55,7 +54,7 @@ func un_make_action(_ payload: UNNotificationActionPayload) -> UNNotificationAct
             payload.localized_text_input_placeholder,
             fallback: textInputPlaceholder
         )
-        if #available(macOS 12.0, *), let icon = un_make_action_icon(payload.icon) {
+        if let icon = un_make_action_icon(payload.icon) {
             return UNTextInputNotificationAction(
                 identifier: payload.identifier,
                 title: title,
@@ -74,7 +73,7 @@ func un_make_action(_ payload: UNNotificationActionPayload) -> UNNotificationAct
         )
     }
 
-    if #available(macOS 12.0, *), let icon = un_make_action_icon(payload.icon) {
+    if let icon = un_make_action_icon(payload.icon) {
         return UNNotificationAction(
             identifier: payload.identifier,
             title: title,

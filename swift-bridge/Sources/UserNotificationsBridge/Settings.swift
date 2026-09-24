@@ -29,23 +29,8 @@ func un_settings_payload(_ settings: UNNotificationSettings) -> UNNotificationSe
         show_previews_setting: Int32(settings.showPreviewsSetting.rawValue),
         critical_alert_setting: Int32(settings.criticalAlertSetting.rawValue),
         provides_app_notification_settings: settings.providesAppNotificationSettings,
-        time_sensitive_setting: {
-            if #available(macOS 12.0, *) {
-                return Int32(settings.timeSensitiveSetting.rawValue)
-            }
-            return 0
-        }(),
-        scheduled_delivery_setting: {
-            if #available(macOS 12.0, *) {
-                return Int32(settings.scheduledDeliverySetting.rawValue)
-            }
-            return 0
-        }(),
-        direct_messages_setting: {
-            if #available(macOS 12.0, *) {
-                return Int32(settings.directMessagesSetting.rawValue)
-            }
-            return 0
-        }()
+        time_sensitive_setting: Int32(settings.timeSensitiveSetting.rawValue),
+        scheduled_delivery_setting: Int32(settings.scheduledDeliverySetting.rawValue),
+        direct_messages_setting: Int32(settings.directMessagesSetting.rawValue)
     )
 }

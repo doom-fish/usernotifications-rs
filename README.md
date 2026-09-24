@@ -14,9 +14,9 @@ Safe, idiomatic Rust bindings for Apple's [UserNotifications](https://developer.
 
 ## Requirements
 
-- macOS 10.14 or newer
+- macOS 12 or newer
 - Xcode 16 or newer (the bridge uses macOS 15 SDK symbols behind runtime availability checks)
-- Some APIs are availability-gated by Apple (`UNNotificationContentExtension` on macOS 11+, action icons / interruption metadata on macOS 12+, badge count / filter criteria on macOS 13+, content-provider specialization on macOS 15+). The `async` feature's operations need macOS 12 and fail with an error on older systems.
+- Some APIs are availability-gated by Apple (badge count / filter criteria on macOS 13+, content-provider specialization on macOS 15+).
 - For authorization and local-notification delivery in GUI apps, the app must run with the appropriate notification entitlements and user consent
 
 ## Installation
