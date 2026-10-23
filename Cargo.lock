@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "apple-cf"
-version = "0.11.0"
+version = "0.11.2"
 dependencies = [
  "doom-fish-utils",
 ]

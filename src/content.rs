@@ -811,7 +811,7 @@ mod tests {
         assert!(content.badge.is_none());
         assert!(content.user_info.is_none());
         assert!(content.sound.is_none());
-        assert!(content.attachments.is_empty());
+        assert_eq!(content.attachments, [] as [crate::attachment::NotificationAttachment; 0]);
         assert!(content.interruption_level.is_none());
         assert!(content.relevance_score.is_none());
         assert!(content.filter_criteria.is_none());
