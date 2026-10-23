@@ -23,11 +23,12 @@ public func un_center_request_authorization_async(
         return
     }
 
-    Task {
-        do {
-            let granted = try await center.requestAuthorization(
-                options: UNAuthorizationOptions(rawValue: UInt(truncatingIfNeeded: options))
-            )
+    center.requestAuthorization(
+        options: UNAuthorizationOptions(rawValue: UInt(truncatingIfNeeded: options))
+    ) { granted, error in
+        if let error {
+            error.localizedDescription.withCString { callback(nil, $0, context) }
+        } else {
             // The Rust callback reads a single byte from `result` and does not
             // free it, so pass a pointer to a stack byte that is valid for the
             // synchronous duration of the callback (no allocation, no leak).
@@ -35,9 +36,22 @@ public func un_center_request_authorization_async(
             withUnsafePointer(to: &boolValue) {
                 callback(UnsafeRawPointer($0), nil, context)
             }
-        } catch {
-            error.localizedDescription.withCString { callback(nil, $0, context) }
         }
+    }
+}
+
+func un_add_notification_request(
+    _ requestJson: UnsafePointer<CChar>,
+    using add: (UNNotificationRequest, @escaping (Error?) -> Void) -> Void,
+    completion: @escaping (Error?) -> Void
+) {
+    do {
+        let request = try un_make_request(
+            un_decode_json(requestJson, as: UNNotificationRequestPayload.self)
+        )
+        add(request, completion)
+    } catch {
+        completion(error)
     }
 }
 
@@ -54,22 +68,14 @@ public func un_center_add_notification_request_async(
         "notification center must not be null".withCString { callback(nil, $0, context) }
         return
     }
-    let request: UNNotificationRequest
-    do {
-        request = try un_make_request(
-            un_decode_json(requestJson, as: UNNotificationRequestPayload.self)
-        )
-    } catch {
-        error.localizedDescription.withCString { callback(nil, $0, context) }
-        return
-    }
 
-    Task {
-        do {
-            try await center.add(request)
-            callback(nil, nil, context)
-        } catch {
+    un_add_notification_request(requestJson, using: { request, completion in
+        center.add(request, withCompletionHandler: completion)
+    }) { error in
+        if let error {
             error.localizedDescription.withCString { callback(nil, $0, context) }
+        } else {
+            callback(nil, nil, context)
         }
     }
 }
@@ -87,21 +93,16 @@ public func un_center_get_delivered_notifications_async(
         return
     }
 
-    Task {
-        do {
-            let notifications = try await center.deliveredNotifications()
-            let payloads = notifications.map { UNNotificationPayload(
-                date: $0.date.timeIntervalSince1970,
-                request: un_request_payload($0.request)
-            ) }
-            let jsonString = un_encode_json(payloads)
-            // Rust takes ownership of this C string and frees it, matching the
-            // synchronous bridge's un_string/strdup convention.
-            let cString = un_string(jsonString)
-            callback(cString.map(UnsafeRawPointer.init), nil, context)
-        } catch {
-            error.localizedDescription.withCString { callback(nil, $0, context) }
-        }
+    center.getDeliveredNotifications { notifications in
+        let payloads = notifications.map { UNNotificationPayload(
+            date: $0.date.timeIntervalSince1970,
+            request: un_request_payload($0.request)
+        ) }
+        let jsonString = un_encode_json(payloads)
+        // Rust takes ownership of this C string and frees it, matching the
+        // synchronous bridge's un_string/strdup convention.
+        let cString = un_string(jsonString)
+        callback(cString.map(UnsafeRawPointer.init), nil, context)
     }
 }
 
@@ -118,18 +119,13 @@ public func un_center_get_pending_notification_requests_async(
         return
     }
 
-    Task {
-        do {
-            let requests = try await center.pendingNotificationRequests()
-            let payloads = requests.map { un_request_payload($0) }
-            let jsonString = un_encode_json(payloads)
-            // Rust takes ownership of this C string and frees it, matching the
-            // synchronous bridge's un_string/strdup convention.
-            let cString = un_string(jsonString)
-            callback(cString.map(UnsafeRawPointer.init), nil, context)
-        } catch {
-            error.localizedDescription.withCString { callback(nil, $0, context) }
-        }
+    center.getPendingNotificationRequests { requests in
+        let payloads = requests.map { un_request_payload($0) }
+        let jsonString = un_encode_json(payloads)
+        // Rust takes ownership of this C string and frees it, matching the
+        // synchronous bridge's un_string/strdup convention.
+        let cString = un_string(jsonString)
+        callback(cString.map(UnsafeRawPointer.init), nil, context)
     }
 }
 
@@ -146,20 +142,15 @@ public func un_center_get_notification_categories_async(
         return
     }
 
-    Task {
-        do {
-            let categories = try await center.notificationCategories()
-            let payloads = Array(categories)
-                .sorted { $0.identifier < $1.identifier }
-                .map { un_category_payload($0) }
-            let jsonString = un_encode_json(payloads)
-            // Rust takes ownership of this C string and frees it, matching the
-            // synchronous bridge's un_string/strdup convention.
-            let cString = un_string(jsonString)
-            callback(cString.map(UnsafeRawPointer.init), nil, context)
-        } catch {
-            error.localizedDescription.withCString { callback(nil, $0, context) }
-        }
+    center.getNotificationCategories { categories in
+        let payloads = Array(categories)
+            .sorted { $0.identifier < $1.identifier }
+            .map { un_category_payload($0) }
+        let jsonString = un_encode_json(payloads)
+        // Rust takes ownership of this C string and frees it, matching the
+        // synchronous bridge's un_string/strdup convention.
+        let cString = un_string(jsonString)
+        callback(cString.map(UnsafeRawPointer.init), nil, context)
     }
 }
 
@@ -176,18 +167,13 @@ public func un_center_get_notification_settings_async(
         return
     }
 
-    Task {
-        do {
-            let settings = try await center.notificationSettings()
-            let payload = un_settings_payload(settings)
-            let jsonString = un_encode_json(payload)
-            // Rust takes ownership of this C string and frees it, matching the
-            // synchronous bridge's un_string/strdup convention.
-            let cString = un_string(jsonString)
-            callback(cString.map(UnsafeRawPointer.init), nil, context)
-        } catch {
-            error.localizedDescription.withCString { callback(nil, $0, context) }
-        }
+    center.getNotificationSettings { settings in
+        let payload = un_settings_payload(settings)
+        let jsonString = un_encode_json(payload)
+        // Rust takes ownership of this C string and frees it, matching the
+        // synchronous bridge's un_string/strdup convention.
+        let cString = un_string(jsonString)
+        callback(cString.map(UnsafeRawPointer.init), nil, context)
     }
 }
 

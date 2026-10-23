@@ -18,6 +18,11 @@ let package = Package(
             name: "UserNotificationsBridge",
             path: "Sources/UserNotificationsBridge",
             publicHeadersPath: "include"
+        ),
+        .testTarget(
+            name: "UserNotificationsBridgeTests",
+            dependencies: ["UserNotificationsBridge"],
+            path: "Tests/UserNotificationsBridgeTests"
         )
     ]
 )
