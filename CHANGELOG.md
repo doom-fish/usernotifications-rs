@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-26
+
+### Fixed
+
+- Build the Swift bridge with the default SwiftPM build engine and use its reported product directory.
+
 ## [0.4.2] - 2026-10-24
 
 ### Fixed
