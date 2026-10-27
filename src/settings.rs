@@ -1,10 +1,6 @@
-use core::ffi::c_char;
-
-use serde::Deserialize;
-
+use crate::binary::decode_binary;
 use crate::error::UserNotificationsError;
 use crate::option_set::raw_option_set;
-use crate::private::decode_json;
 
 raw_option_set!(AuthorizationOptions);
 
@@ -159,7 +155,7 @@ pub struct NotificationSettings {
     pub direct_messages_setting: NotificationSetting,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct NotificationSettingsPayload {
     authorization_status: i32,
     sound_setting: i32,
@@ -200,10 +196,48 @@ impl From<NotificationSettingsPayload> for NotificationSettings {
     }
 }
 
-pub(crate) fn decode_settings_json(
-    ptr: *mut c_char,
+pub(crate) fn decode_settings_binary(
+    ptr: *mut crate::ffi::abi::UNBufferRaw,
 ) -> Result<NotificationSettings, UserNotificationsError> {
-    decode_json::<NotificationSettingsPayload>(ptr).map(Into::into)
+    decode_binary::<NotificationSettingsPayload>(ptr).map(Into::into)
+}
+
+impl crate::binary::Record for NotificationSettingsPayload {
+    type Raw = crate::ffi::abi::UNNotificationSettingsPayloadRaw;
+    fn raw(&self, _arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            authorization_status: self.authorization_status,
+            sound_setting: self.sound_setting,
+            badge_setting: self.badge_setting,
+            alert_setting: self.alert_setting,
+            notification_center_setting: self.notification_center_setting,
+            lock_screen_setting: self.lock_screen_setting,
+            alert_style: self.alert_style,
+            show_previews_setting: self.show_previews_setting,
+            critical_alert_setting: self.critical_alert_setting,
+            provides_app_notification_settings: u8::from(self.provides_app_notification_settings),
+            time_sensitive_setting: self.time_sensitive_setting,
+            scheduled_delivery_setting: self.scheduled_delivery_setting,
+            direct_messages_setting: self.direct_messages_setting,
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            authorization_status: raw.authorization_status,
+            sound_setting: raw.sound_setting,
+            badge_setting: raw.badge_setting,
+            alert_setting: raw.alert_setting,
+            notification_center_setting: raw.notification_center_setting,
+            lock_screen_setting: raw.lock_screen_setting,
+            alert_style: raw.alert_style,
+            show_previews_setting: raw.show_previews_setting,
+            critical_alert_setting: raw.critical_alert_setting,
+            provides_app_notification_settings: raw.provides_app_notification_settings != 0,
+            time_sensitive_setting: raw.time_sensitive_setting,
+            scheduled_delivery_setting: raw.scheduled_delivery_setting,
+            direct_messages_setting: raw.direct_messages_setting,
+        })
+    }
 }
 
 #[cfg(test)]

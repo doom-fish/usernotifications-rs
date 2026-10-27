@@ -1,14 +1,11 @@
-use core::ffi::c_char;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use serde::{Deserialize, Serialize};
-
+use crate::binary::decode_binary;
 use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
-use crate::private::{decode_json, to_cstring};
 
 /// Wraps the date components used by `UNCalendarNotificationTrigger`.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct DateComponents {
     /// The year.
     pub year: Option<i64>,
@@ -185,20 +182,20 @@ impl NotificationTrigger {
 
     /// Round-trips this trigger through the Swift bridge.
     pub fn bridge_roundtrip(&self) -> Result<Self, UserNotificationsError> {
-        let trigger = encode_trigger_json(self)?;
-        let trigger = to_cstring(&trigger)?;
+        let trigger = encode_trigger_binary(self)?;
+
         let mut error = core::ptr::null_mut();
         let payload =
-            unsafe { ffi::trigger::un_trigger_roundtrip_json(trigger.as_ptr(), &raw mut error) };
+            unsafe { ffi::trigger::un_trigger_roundtrip_binary(trigger.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
-            decode_trigger_json(payload)
+            decode_trigger_binary(payload)
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct NotificationTriggerPayload {
     kind: String,
     repeats: Option<bool>,
@@ -278,21 +275,19 @@ impl From<NotificationTriggerPayload> for NotificationTrigger {
     }
 }
 
-pub(crate) fn encode_trigger_json(
+pub(crate) fn encode_trigger_binary(
     trigger: &NotificationTrigger,
-) -> Result<String, UserNotificationsError> {
+) -> Result<crate::binary::Input, UserNotificationsError> {
     trigger.validate()?;
-    serde_json::to_string(&NotificationTriggerPayload::from(trigger)).map_err(|error| {
-        UserNotificationsError::FrameworkError(format!(
-            "failed to encode notification trigger: {error}",
-        ))
-    })
+    Ok(crate::binary::Input::new(
+        &NotificationTriggerPayload::from(trigger),
+    ))
 }
 
-pub(crate) fn decode_trigger_json(
-    ptr: *mut c_char,
+pub(crate) fn decode_trigger_binary(
+    ptr: *mut crate::ffi::abi::UNBufferRaw,
 ) -> Result<NotificationTrigger, UserNotificationsError> {
-    decode_json::<NotificationTriggerPayload>(ptr).map(Into::into)
+    decode_binary::<NotificationTriggerPayload>(ptr).map(Into::into)
 }
 
 #[allow(clippy::single_option_map)]
@@ -313,10 +308,125 @@ fn system_time_from_timestamp_opt(timestamp: Option<f64>) -> Option<SystemTime> 
     })
 }
 
+impl crate::binary::Record for DateComponents {
+    type Raw = crate::ffi::abi::UNDateComponentsRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            year: self.year.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = *value;
+                arena.keep(raw)
+            }),
+            month: self.month.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = *value;
+                arena.keep(raw)
+            }),
+            day: self.day.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = *value;
+                arena.keep(raw)
+            }),
+            hour: self.hour.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = *value;
+                arena.keep(raw)
+            }),
+            minute: self.minute.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = *value;
+                arena.keep(raw)
+            }),
+            second: self.second.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = *value;
+                arena.keep(raw)
+            }),
+            weekday: self.weekday.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = *value;
+                arena.keep(raw)
+            }),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            year: unsafe { raw.year.as_ref() }.copied(),
+            month: unsafe { raw.month.as_ref() }.copied(),
+            day: unsafe { raw.day.as_ref() }.copied(),
+            hour: unsafe { raw.hour.as_ref() }.copied(),
+            minute: unsafe { raw.minute.as_ref() }.copied(),
+            second: unsafe { raw.second.as_ref() }.copied(),
+            weekday: unsafe { raw.weekday.as_ref() }.copied(),
+        })
+    }
+}
+
+impl crate::binary::Record for NotificationTriggerPayload {
+    type Raw = crate::ffi::abi::UNNotificationTriggerPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            kind: match self.kind.as_str() {
+                "timeInterval" => 1,
+                "calendar" => 2,
+                "push" => 3,
+                "location" => 4,
+                "unknown" => 5,
+                _ => 0,
+            },
+            repeats: self.repeats.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = u8::from(*value);
+                arena.keep(raw)
+            }),
+            time_interval: self
+                .time_interval
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = *value;
+                    arena.keep(raw)
+                }),
+            date_components: self
+                .date_components
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+            next_trigger_date: self
+                .next_trigger_date
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = *value;
+                    arena.keep(raw)
+                }),
+            class_name: self.class_name.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = crate::binary::Record::raw(value, arena);
+                arena.keep(raw)
+            }),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            kind: match raw.kind {
+                0 => "none",
+                1 => "timeInterval",
+                2 => "calendar",
+                3 => "push",
+                4 => "location",
+                5 => "unknown",
+                _ => return Err(crate::binary::invalid_data()),
+            }
+            .to_owned(),
+            repeats: unsafe { raw.repeats.as_ref() }.map(|value| *value != 0),
+            time_interval: unsafe { raw.time_interval.as_ref() }.copied(),
+            date_components: unsafe { raw.date_components.as_ref() }
+                .map(|value| unsafe { <DateComponents as crate::binary::Record>::read(value) })
+                .transpose()?,
+            next_trigger_date: unsafe { raw.next_trigger_date.as_ref() }.copied(),
+            class_name: unsafe { raw.class_name.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        encode_trigger_json, system_time_from_timestamp_opt, CalendarTrigger, DateComponents,
+        encode_trigger_binary, system_time_from_timestamp_opt, CalendarTrigger, DateComponents,
         NotificationTrigger, TimeIntervalTrigger,
     };
     use crate::error::UserNotificationsError;
@@ -334,14 +444,14 @@ mod tests {
             let trigger = NotificationTrigger::time_interval(seconds, repeats);
             assert!(
                 matches!(
-                    encode_trigger_json(&trigger),
+                    encode_trigger_binary(&trigger),
                     Err(UserNotificationsError::InvalidArgument(_))
                 ),
                 "{seconds} s (repeats: {repeats}) must be rejected"
             );
         }
-        assert!(encode_trigger_json(&NotificationTrigger::time_interval(0.5, false)).is_ok());
-        assert!(encode_trigger_json(&NotificationTrigger::time_interval(60.0, true)).is_ok());
+        assert!(encode_trigger_binary(&NotificationTrigger::time_interval(0.5, false)).is_ok());
+        assert!(encode_trigger_binary(&NotificationTrigger::time_interval(60.0, true)).is_ok());
     }
 
     #[test]
@@ -366,8 +476,8 @@ mod tests {
             .with_second(56)
             .with_weekday(4);
 
-        let encoded = serde_json::to_string(&components).unwrap();
-        let roundtrip: DateComponents = serde_json::from_str(&encoded).unwrap();
+        let encoded = crate::binary::Input::new(&components);
+        let roundtrip: DateComponents = unsafe { crate::binary::read(encoded.as_ptr()) }.unwrap();
 
         assert_eq!(roundtrip, components);
     }

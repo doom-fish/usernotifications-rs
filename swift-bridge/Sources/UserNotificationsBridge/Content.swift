@@ -1,21 +1,22 @@
+import UserNotificationsABI
 import Foundation
 import Intents
 import UserNotifications
 
-struct UNNotificationSoundPayload: Codable {
+struct UNNotificationSoundPayload {
     var kind: String
     var name: String?
     var volume: Float?
 }
 
-struct UNNotificationContentPayload: Codable {
+struct UNNotificationContentPayload {
     var title: String
     var subtitle: String
     var body: String
     var badge: Int64?
     var category_identifier: String
     var thread_identifier: String
-    var user_info: [String: UNJSONValue]?
+    var user_info: [String: UNPropertyValue]?
     var sound: UNNotificationSoundPayload?
     var attachments: [UNNotificationAttachmentPayload]
     var summary_argument: String
@@ -29,7 +30,7 @@ struct UNNotificationContentPayload: Codable {
     var localized_summary_argument: UNLocalizedStringPayload?
 }
 
-struct UNNotificationMessagePersonPayload: Codable {
+struct UNNotificationMessagePersonPayload {
     var handle: String
     var handle_type: Int32
     var display_name: String?
@@ -38,7 +39,7 @@ struct UNNotificationMessagePersonPayload: Codable {
     var is_me: Bool
 }
 
-struct UNNotificationAttributedMessageContextPayload: Codable {
+struct UNNotificationAttributedMessageContextPayload {
     var sender: UNNotificationMessagePersonPayload?
     var recipients: [UNNotificationMessagePersonPayload]
     var attributed_content: String
@@ -49,7 +50,7 @@ struct UNNotificationAttributedMessageContextPayload: Codable {
     var group_name: String?
 }
 
-struct UNNotificationContentProviderPayload: Codable {
+struct UNNotificationContentProviderPayload {
     var kind: String
     var attributed_message_context: UNNotificationAttributedMessageContextPayload?
 }
@@ -240,13 +241,13 @@ func un_content_payload(
     _ content: UNNotificationContent,
     source: UNNotificationContentPayload? = nil
 ) -> UNNotificationContentPayload {
-    let userInfo: [String: UNJSONValue]? = {
+    let userInfo: [String: UNPropertyValue]? = {
         guard !content.userInfo.isEmpty else {
             return nil
         }
-        var encoded: [String: UNJSONValue] = [:]
+        var encoded: [String: UNPropertyValue] = [:]
         for (key, value) in content.userInfo {
-            encoded[String(describing: key)] = UNJSONValue.fromFoundationObject(value)
+            encoded[String(describing: key)] = UNPropertyValue.fromFoundationObject(value)
         }
         return encoded
     }()
@@ -287,30 +288,30 @@ func un_content_payload(
     )
 }
 
-@_cdecl("un_content_roundtrip_json")
-public func un_content_roundtrip_json(
-    _ contentJSON: UnsafePointer<CChar>?,
+@_cdecl("un_content_roundtrip_binary")
+public func un_content_roundtrip_binary(
+    _ contentBinary: UnsafePointer<UNBufferRaw>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> UnsafeMutablePointer<CChar>? {
+) -> UnsafeMutablePointer<UNBufferRaw>? {
     do {
-        let payload = try un_decode_json(contentJSON, as: UNNotificationContentPayload.self)
+        let payload = try un_decode_binary(contentBinary, as: UNNotificationContentPayload.self)
         let content = try un_make_content(payload)
-        return un_string(un_encode_json(un_content_payload(content, source: payload)))
+        return un_encode_binary(un_content_payload(content, source: payload))
     } catch {
         un_write_error(errorOut, error: error)
         return nil
     }
 }
 
-@_cdecl("un_content_updating_with_provider_json")
-public func un_content_updating_with_provider_json(
-    _ contentJSON: UnsafePointer<CChar>?,
-    _ providerJSON: UnsafePointer<CChar>?,
+@_cdecl("un_content_updating_with_provider_binary")
+public func un_content_updating_with_provider_binary(
+    _ contentBinary: UnsafePointer<UNBufferRaw>?,
+    _ providerBinary: UnsafePointer<UNBufferRaw>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> UnsafeMutablePointer<CChar>? {
+) -> UnsafeMutablePointer<UNBufferRaw>? {
     do {
-        let payload = try un_decode_json(contentJSON, as: UNNotificationContentPayload.self)
-        let providerPayload = try un_decode_json(providerJSON, as: UNNotificationContentProviderPayload.self)
+        let payload = try un_decode_binary(contentBinary, as: UNNotificationContentPayload.self)
+        let providerPayload = try un_decode_binary(providerBinary, as: UNNotificationContentProviderPayload.self)
         let content = try un_make_content(payload)
         let updatedContent: UNNotificationContent
         if #available(macOS 15.0, *) {
@@ -320,7 +321,7 @@ public func un_content_updating_with_provider_json(
                 NSLocalizedDescriptionKey: "notification content providers require macOS 15 or newer",
             ])
         }
-        return un_string(un_encode_json(un_content_payload(updatedContent, source: payload)))
+        return un_encode_binary(un_content_payload(updatedContent, source: payload))
     } catch {
         un_write_error(errorOut, error: error)
         return nil

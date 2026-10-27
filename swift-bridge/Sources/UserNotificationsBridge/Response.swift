@@ -1,7 +1,8 @@
+import UserNotificationsABI
 import Foundation
 import UserNotifications
 
-struct UNNotificationResponsePayload: Codable {
+struct UNNotificationResponsePayload {
     var action_identifier: String
     var notification: UNNotificationPayload
     var user_text: String?

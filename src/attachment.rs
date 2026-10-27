@@ -1,11 +1,8 @@
-use core::ffi::c_char;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
-
+use crate::binary::decode_binary;
 use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
-use crate::private::{decode_json, to_cstring};
 
 /// Matches `UNNotificationAttachmentOptionsTypeHintKey`.
 pub const ATTACHMENT_OPTIONS_TYPE_HINT_KEY: &str = "UNNotificationAttachmentOptionsTypeHintKey";
@@ -154,21 +151,21 @@ impl NotificationAttachment {
 
     /// Round-trips this value through the Swift bridge.
     pub fn bridge_roundtrip(&self) -> Result<Self, UserNotificationsError> {
-        let attachment = encode_attachment_json(self)?;
-        let attachment = to_cstring(&attachment)?;
+        let attachment = encode_attachment_binary(self);
+
         let mut error = core::ptr::null_mut();
         let payload = unsafe {
-            ffi::attachment::un_attachment_roundtrip_json(attachment.as_ptr(), &raw mut error)
+            ffi::attachment::un_attachment_roundtrip_binary(attachment.as_ptr(), &raw mut error)
         };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
-            decode_attachment_json(payload)
+            decode_attachment_binary(payload)
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct AttachmentThumbnailClippingRectPayload {
     x: f64,
     y: f64,
@@ -198,10 +195,37 @@ impl From<AttachmentThumbnailClippingRectPayload> for AttachmentThumbnailClippin
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 enum AttachmentThumbnailTimePayload {
     Seconds(f64),
     Frame(u64),
+}
+
+impl crate::binary::Record for AttachmentThumbnailTimePayload {
+    type Raw = crate::ffi::abi::UNAttachmentThumbnailTimePayloadRaw;
+
+    fn raw(&self, _arena: &mut crate::binary::Arena) -> Self::Raw {
+        match self {
+            Self::Seconds(seconds) => Self::Raw {
+                tag: 1,
+                seconds: *seconds,
+                frame: 0,
+            },
+            Self::Frame(frame) => Self::Raw {
+                tag: 2,
+                seconds: 0.0,
+                frame: *frame,
+            },
+        }
+    }
+
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        match raw.tag {
+            1 => Ok(Self::Seconds(raw.seconds)),
+            2 => Ok(Self::Frame(raw.frame)),
+            _ => Err(crate::binary::invalid_data()),
+        }
+    }
 }
 
 impl From<&AttachmentThumbnailTime> for AttachmentThumbnailTimePayload {
@@ -222,7 +246,7 @@ impl From<AttachmentThumbnailTimePayload> for AttachmentThumbnailTime {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct NotificationAttachmentOptionsPayload {
     type_hint: Option<String>,
     thumbnail_hidden: bool,
@@ -258,7 +282,7 @@ impl From<NotificationAttachmentOptionsPayload> for NotificationAttachmentOption
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct NotificationAttachmentPayload {
     identifier: String,
     file_path: String,
@@ -288,18 +312,109 @@ impl From<NotificationAttachmentPayload> for NotificationAttachment {
     }
 }
 
-pub(crate) fn encode_attachment_json(
+pub(crate) fn encode_attachment_binary(
     attachment: &NotificationAttachment,
-) -> Result<String, UserNotificationsError> {
-    serde_json::to_string(&NotificationAttachmentPayload::from(attachment)).map_err(|error| {
-        UserNotificationsError::FrameworkError(format!(
-            "failed to encode notification attachment: {error}",
-        ))
-    })
+) -> crate::binary::Input {
+    crate::binary::Input::new(&NotificationAttachmentPayload::from(attachment))
 }
 
-pub(crate) fn decode_attachment_json(
-    ptr: *mut c_char,
+pub(crate) fn decode_attachment_binary(
+    ptr: *mut crate::ffi::abi::UNBufferRaw,
 ) -> Result<NotificationAttachment, UserNotificationsError> {
-    decode_json::<NotificationAttachmentPayload>(ptr).map(Into::into)
+    decode_binary::<NotificationAttachmentPayload>(ptr).map(Into::into)
+}
+
+impl crate::binary::Record for AttachmentThumbnailClippingRectPayload {
+    type Raw = crate::ffi::abi::UNAttachmentThumbnailClippingRectPayloadRaw;
+    fn raw(&self, _arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            x: self.x,
+            y: self.y,
+            width: self.width,
+            height: self.height,
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            x: raw.x,
+            y: raw.y,
+            width: raw.width,
+            height: raw.height,
+        })
+    }
+}
+
+impl crate::binary::Record for NotificationAttachmentOptionsPayload {
+    type Raw = crate::ffi::abi::UNNotificationAttachmentOptionsPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            type_hint: self.type_hint.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = crate::binary::Record::raw(value, arena);
+                arena.keep(raw)
+            }),
+            thumbnail_hidden: u8::from(self.thumbnail_hidden),
+            thumbnail_clipping_rect: self.thumbnail_clipping_rect.as_ref().map_or(
+                core::ptr::null(),
+                |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                },
+            ),
+            thumbnail_time: self
+                .thumbnail_time
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            type_hint: unsafe { raw.type_hint.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+            thumbnail_hidden: raw.thumbnail_hidden != 0,
+            thumbnail_clipping_rect: unsafe { raw.thumbnail_clipping_rect.as_ref() }
+                .map(|value| unsafe {
+                    <AttachmentThumbnailClippingRectPayload as crate::binary::Record>::read(value)
+                })
+                .transpose()?,
+            thumbnail_time: unsafe { raw.thumbnail_time.as_ref() }
+                .map(|value| unsafe {
+                    <AttachmentThumbnailTimePayload as crate::binary::Record>::read(value)
+                })
+                .transpose()?,
+        })
+    }
+}
+
+impl crate::binary::Record for NotificationAttachmentPayload {
+    type Raw = crate::ffi::abi::UNNotificationAttachmentPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            identifier: crate::binary::Record::raw(&self.identifier, arena),
+            file_path: crate::binary::Record::raw(&self.file_path, arena),
+            attachment_type: self
+                .attachment_type
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+            options: crate::binary::Record::raw(&self.options, arena),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            identifier: unsafe { <String as crate::binary::Record>::read(&raw.identifier) }?,
+            file_path: unsafe { <String as crate::binary::Record>::read(&raw.file_path) }?,
+            attachment_type: unsafe { raw.attachment_type.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+            options: unsafe {
+                <NotificationAttachmentOptionsPayload as crate::binary::Record>::read(&raw.options)
+            }?,
+        })
+    }
 }

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-27
+
+### Changed
+
+- Replace all 25 JSON bridge functions with binary C records and explicit field maps.
+- Replace five text callback signatures with binary buffer signatures.
+- Remove the serialization dependencies and derives.
+- Remove the unused Rust Core Foundation dependency.
+- Replace JSON user info with `NotificationUserInfo` and typed `NotificationValue` values.
+- Use typed values for localization arguments. Support native dictionary data and date values.
+- Give each output buffer its owner and release function. Keep callback input buffers valid until each callback returns.
+- Replace the content-provider text encoder with a typed context accessor.
+
 ## [0.4.4] - 2026-10-27
 
 ### Changed

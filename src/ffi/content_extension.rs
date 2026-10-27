@@ -1,22 +1,23 @@
+use crate::ffi::abi::UNBufferRaw;
 use core::ffi::{c_char, c_void};
 
 pub type ContentExtensionNotificationCallback =
-    unsafe extern "C" fn(*mut c_void, *const c_char);
+    unsafe extern "C" fn(*mut c_void, *const UNBufferRaw);
 pub type ContentExtensionResponseCallback =
-    unsafe extern "C" fn(*mut c_void, *const c_char) -> u64;
+    unsafe extern "C" fn(*mut c_void, *const UNBufferRaw) -> u64;
 pub type ContentExtensionSimpleCallback = unsafe extern "C" fn(*mut c_void);
 
 unsafe extern "C" {
     pub fn un_content_extension_context_create(out_context: *mut *mut c_void) -> i32;
     pub fn un_content_extension_context_set_notification_actions(
         context: *mut c_void,
-        actions_json: *const c_char,
+        actions_binary: *const UNBufferRaw,
         error_out: *mut *mut c_char,
     ) -> i32;
-    pub fn un_content_extension_context_get_notification_actions_json(
+    pub fn un_content_extension_context_get_notification_actions_binary(
         context: *mut c_void,
         error_out: *mut *mut c_char,
-    ) -> *mut c_char;
+    ) -> *mut UNBufferRaw;
     pub fn un_content_extension_context_perform_default_action(context: *mut c_void);
     pub fn un_content_extension_context_dismiss(context: *mut c_void);
     pub fn un_content_extension_context_media_playing_started(context: *mut c_void);
@@ -66,14 +67,14 @@ unsafe extern "C" {
         blue: *mut f64,
         alpha: *mut f64,
     ) -> bool;
-    pub fn un_content_extension_simulator_receive_notification_json(
+    pub fn un_content_extension_simulator_receive_notification_binary(
         simulator: *mut c_void,
-        notification_json: *const c_char,
+        notification_binary: *const UNBufferRaw,
         error_out: *mut *mut c_char,
     ) -> i32;
-    pub fn un_content_extension_simulator_receive_response_json(
+    pub fn un_content_extension_simulator_receive_response_binary(
         simulator: *mut c_void,
-        response_json: *const c_char,
+        response_binary: *const UNBufferRaw,
         out_option: *mut u64,
         error_out: *mut *mut c_char,
     ) -> i32;

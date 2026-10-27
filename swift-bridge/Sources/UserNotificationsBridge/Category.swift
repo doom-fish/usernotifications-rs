@@ -1,7 +1,8 @@
+import UserNotificationsABI
 import Foundation
 import UserNotifications
 
-struct UNNotificationCategoryPayload: Codable {
+struct UNNotificationCategoryPayload {
     var identifier: String
     var actions: [UNNotificationActionPayload]
     var intent_identifiers: [String]
@@ -71,15 +72,15 @@ func un_category_payload(
     )
 }
 
-@_cdecl("un_category_roundtrip_json")
-public func un_category_roundtrip_json(
-    _ categoryJSON: UnsafePointer<CChar>?,
+@_cdecl("un_category_roundtrip_binary")
+public func un_category_roundtrip_binary(
+    _ categoryBinary: UnsafePointer<UNBufferRaw>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> UnsafeMutablePointer<CChar>? {
+) -> UnsafeMutablePointer<UNBufferRaw>? {
     do {
-        let payload = try un_decode_json(categoryJSON, as: UNNotificationCategoryPayload.self)
+        let payload = try un_decode_binary(categoryBinary, as: UNNotificationCategoryPayload.self)
         let category = un_make_category(payload)
-        return un_string(un_encode_json(un_category_payload(category, source: payload)))
+        return un_encode_binary(un_category_payload(category, source: payload))
     } catch {
         un_write_error(errorOut, error: error)
         return nil

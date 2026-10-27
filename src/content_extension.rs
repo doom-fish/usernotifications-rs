@@ -1,15 +1,13 @@
-use core::ffi::{c_char, c_void};
+use core::ffi::c_void;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Mutex;
 
-use serde_json::to_string;
-
 use crate::action::{NotificationAction, NotificationActionPayload};
+use crate::binary::decode_binary;
 use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
-use crate::notification::{encode_notification_json, Notification, NotificationPayload};
-use crate::private::{decode_json, to_cstring};
-use crate::response::{encode_response_json, NotificationResponse, NotificationResponsePayload};
+use crate::notification::{encode_notification_binary, Notification, NotificationPayload};
+use crate::response::{encode_response_binary, NotificationResponse, NotificationResponsePayload};
 
 mod private {
     pub trait Sealed {}
@@ -252,16 +250,16 @@ pub struct NotificationContentExtensionSimulator {
 
 extern "C" fn content_notification_trampoline(
     user_info: *mut c_void,
-    notification_json: *const c_char,
+    notification: *const crate::ffi::abi::UNBufferRaw,
 ) {
     let _ = catch_unwind(AssertUnwindSafe(|| {
-        if user_info.is_null() || notification_json.is_null() {
+        if user_info.is_null() || notification.is_null() {
             return;
         }
 
         let state = unsafe { &*(user_info as *const CallbackState) };
-        let json = unsafe { std::ffi::CStr::from_ptr(notification_json) }.to_string_lossy();
-        let Ok(payload) = serde_json::from_str::<NotificationPayload>(&json) else {
+        let Ok(payload) = (unsafe { crate::binary::read::<NotificationPayload>(notification) })
+        else {
             return;
         };
 
@@ -273,16 +271,16 @@ extern "C" fn content_notification_trampoline(
 
 extern "C" fn content_response_trampoline(
     user_info: *mut c_void,
-    response_json: *const c_char,
+    response: *const crate::ffi::abi::UNBufferRaw,
 ) -> u64 {
     catch_unwind(AssertUnwindSafe(|| {
-        if user_info.is_null() || response_json.is_null() {
+        if user_info.is_null() || response.is_null() {
             return NotificationContentExtensionResponseOption::DismissAndForwardAction as u64;
         }
 
         let state = unsafe { &*(user_info as *const CallbackState) };
-        let json = unsafe { std::ffi::CStr::from_ptr(response_json) }.to_string_lossy();
-        let Ok(payload) = serde_json::from_str::<NotificationResponsePayload>(&json) else {
+        let Ok(payload) = (unsafe { crate::binary::read::<NotificationResponsePayload>(response) })
+        else {
             return NotificationContentExtensionResponseOption::DismissAndForwardAction as u64;
         };
 
@@ -345,17 +343,12 @@ impl NotificationContentExtensionContext {
             .iter()
             .map(NotificationActionPayload::from)
             .collect::<Vec<_>>();
-        let json = to_string(&payloads).map_err(|error| {
-            UserNotificationsError::FrameworkError(format!(
-                "failed to encode notification actions: {error}",
-            ))
-        })?;
-        let json = to_cstring(&json)?;
+        let actions = crate::binary::Input::new(&payloads);
         let mut error = core::ptr::null_mut();
         let status = unsafe {
             ffi::content_extension::un_content_extension_context_set_notification_actions(
                 self.raw,
-                json.as_ptr(),
+                actions.as_ptr(),
                 &raw mut error,
             )
         };
@@ -370,14 +363,15 @@ impl NotificationContentExtensionContext {
     pub fn notification_actions(&self) -> Result<Vec<NotificationAction>, UserNotificationsError> {
         let mut error = core::ptr::null_mut();
         let payload = unsafe {
-            ffi::content_extension::un_content_extension_context_get_notification_actions_json(
-                self.raw, &raw mut error,
+            ffi::content_extension::un_content_extension_context_get_notification_actions_binary(
+                self.raw,
+                &raw mut error,
             )
         };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
-            decode_json::<Vec<NotificationActionPayload>>(payload)
+            decode_binary::<Vec<NotificationActionPayload>>(payload)
                 .map(|actions| actions.into_iter().map(Into::into).collect())
         }
     }
@@ -568,11 +562,10 @@ impl NotificationContentExtensionSimulator {
         &self,
         notification: &Notification,
     ) -> Result<(), UserNotificationsError> {
-        let notification = encode_notification_json(notification)?;
-        let notification = to_cstring(&notification)?;
+        let notification = encode_notification_binary(notification);
         let mut error = core::ptr::null_mut();
         let status = unsafe {
-            ffi::content_extension::un_content_extension_simulator_receive_notification_json(
+            ffi::content_extension::un_content_extension_simulator_receive_notification_binary(
                 self.raw,
                 notification.as_ptr(),
                 &raw mut error,
@@ -590,12 +583,11 @@ impl NotificationContentExtensionSimulator {
         &self,
         response: &NotificationResponse,
     ) -> Result<NotificationContentExtensionResponseOption, UserNotificationsError> {
-        let response = encode_response_json(response)?;
-        let response = to_cstring(&response)?;
+        let response = encode_response_binary(response);
         let mut error = core::ptr::null_mut();
         let mut option = 0;
         let status = unsafe {
-            ffi::content_extension::un_content_extension_simulator_receive_response_json(
+            ffi::content_extension::un_content_extension_simulator_receive_response_binary(
                 self.raw,
                 response.as_ptr(),
                 &raw mut option,

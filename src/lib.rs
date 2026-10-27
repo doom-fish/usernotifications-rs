@@ -20,6 +20,7 @@
 pub mod action;
 /// Wrappers for `UNNotificationAttachment` and attachment option keys.
 pub mod attachment;
+mod binary;
 /// Wrappers for `UNNotificationCategory` and related option types.
 pub mod category;
 /// Wrappers for `UNUserNotificationCenter` and delegate integration.
@@ -35,7 +36,6 @@ pub mod ffi;
 /// Wrappers for `UNNotification`.
 pub mod notification;
 mod option_set;
-mod private;
 /// Wrappers for `UNNotificationRequest`.
 pub mod request;
 /// Wrappers for `UNNotificationResponse` and presentation options.
@@ -47,6 +47,8 @@ pub mod settings;
 mod system;
 /// Wrappers for `UNNotificationTrigger` and concrete trigger types.
 pub mod trigger;
+#[allow(missing_docs)]
+pub mod value;
 
 /// Async wrappers for `UNUserNotificationCenter` completion-handler APIs.
 #[cfg(feature = "async")]
@@ -92,6 +94,7 @@ pub use settings::{
     NotificationSettings, ShowPreviewsSetting,
 };
 pub use trigger::{CalendarTrigger, DateComponents, NotificationTrigger, TimeIntervalTrigger};
+pub use value::{NotificationUserInfo, NotificationValue};
 
 /// Common imports.
 pub mod prelude {
@@ -138,4 +141,5 @@ pub mod prelude {
     pub use crate::trigger::{
         CalendarTrigger, DateComponents, NotificationTrigger, TimeIntervalTrigger,
     };
+    pub use crate::value::{NotificationUserInfo, NotificationValue};
 }

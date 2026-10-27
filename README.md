@@ -23,7 +23,7 @@ Safe, idiomatic Rust bindings for Apple's [UserNotifications](https://developer.
 
 ```toml
 [dependencies]
-usernotifications-rs = "0.4.4"
+usernotifications-rs = "0.5"
 ```
 
 ```rust,no_run
@@ -67,6 +67,11 @@ cargo run --example 01_smoke
 
 ## Notes
 
+- Version `0.5.0` uses binary C records for requests, results, and callbacks. The crate has no serialization dependency.
+- Swift imports `UserNotificationsABI.h`. Rust uses matching `#[repr(C)]` records and explicit field maps.
+- Strings and arrays use a pointer and a length. Optional fields use nullable pointers. Variant fields use integer tags.
+- Each output buffer has an owner and a release function. The receiver releases the buffer after it copies the fields.
+- Callback arguments remain valid until the callback returns. Async request calls copy the request before the FFI call returns.
 - `UNUserNotificationCenter::current()` must run from a macOS app bundle. The bundle-aware examples re-launch themselves from `target/debug/examples/*.app` when started via `cargo run`.
 - Every `UserNotificationCenter` value can install its own delegate. The crate sets one shared delegate object on the process-wide center while any value has a delegate installed. It forwards responses and settings requests to every installed delegate and combines the presentation options that all `will_present_notification` implementations return. Clearing or dropping a value removes only its own delegate, and dropping a value that never installed one changes nothing.
 - Blocking calls wait at most 30 seconds and then return `UserNotificationsError::TimedOut`. After an authorization timeout the permission prompt may still be showing; the request hasn't been denied.
@@ -74,9 +79,32 @@ cargo run --example 01_smoke
 - Time-interval triggers need a finite interval greater than zero (at least 60 seconds when repeating); other values return `UserNotificationsError::InvalidArgument` instead of reaching `UNTimeIntervalNotificationTrigger`, which would abort the process.
 - `LocalizedNotificationString` is the Rust representation of Apple's `localizedUserNotificationStringForKey:arguments:` localization flow.
 - Extension APIs are exposed as simulator/context wrappers rather than generated Xcode extension targets, which keeps the crate usable from ordinary Rust test and example binaries.
-- Notification `user_info` values are surfaced as `serde_json::Value` for lossless JSON-friendly transport across the Swift bridge.
+- `NotificationUserInfo` maps string keys to `NotificationValue`. Swift maps these values to an `NSDictionary`.
+- `NotificationValue` supports null, booleans, signed and unsigned integers, real numbers, strings, data, dates, arrays, and dictionaries.
+- `LocalizedNotificationString::arguments` also uses `NotificationValue`.
 - `NotificationContentProviding` is intentionally sealed because Apple only accepts SDK-owned provider objects; `NotificationAttributedMessageContext` is the safe Rust helper for the macOS 15 message-style provider flow.
 - Platform-unavailable APIs such as `UNLocationNotificationTrigger` are documented explicitly in [COVERAGE.md](COVERAGE.md).
+
+## User info
+
+```rust
+use usernotifications::{NotificationContent, NotificationUserInfo, NotificationValue};
+
+let content = NotificationContent::new("Complete", "The file is ready.")
+    .with_user_info(NotificationUserInfo::from([
+        ("completion_id".into(), NotificationValue::from("example-42")),
+    ]));
+assert_eq!(
+    content.user_info.as_ref().and_then(|info| info.get("completion_id"))
+        .and_then(NotificationValue::as_str),
+    Some("example-42"),
+);
+```
+
+The response callback receives the same user info in `response.notification.request.content.user_info`.
+The safe center, category, action, request, and async methods retain their existing signatures.
+The raw FFI buffer signatures replace the former JSON signatures.
+`NotificationContentProviding::attributed_message_context` replaces its text encoder method.
 
 ## License
 

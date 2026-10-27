@@ -1,21 +1,19 @@
-use core::ffi::{c_char, c_void};
+use core::ffi::c_void;
 use std::sync::Mutex;
 
 use doom_fish_utils::callback_context::CallbackContext;
-use serde::Deserialize;
 
-use crate::category::{decode_categories_json, encode_categories_json, NotificationCategory};
+use crate::category::{decode_categories_binary, encode_categories_binary, NotificationCategory};
 use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
-use crate::notification::{decode_notifications_json, Notification, NotificationPayload};
-use crate::private::to_cstring;
-use crate::request::{decode_requests_json, encode_request_json, NotificationRequest};
+use crate::notification::{decode_notifications_binary, Notification, NotificationPayload};
+use crate::request::{decode_requests_binary, encode_request_binary, NotificationRequest};
 use crate::response::{
     NotificationPresentationOptions, NotificationResponse, NotificationResponsePayload,
 };
-use crate::settings::{decode_settings_json, AuthorizationOptions, NotificationSettings};
+use crate::settings::{decode_settings_binary, AuthorizationOptions, NotificationSettings};
 
-#[derive(Deserialize)]
+#[derive(Debug)]
 struct CenterEventPayload {
     event: String,
     notification: Option<NotificationPayload>,
@@ -150,14 +148,16 @@ pub struct UserNotificationCenter {
 unsafe impl Send for UserNotificationCenter {}
 unsafe impl Sync for UserNotificationCenter {}
 
-extern "C" fn center_event_trampoline(context: *mut c_void, event_json: *const c_char) {
-    if event_json.is_null() {
+extern "C" fn center_event_trampoline(
+    context: *mut c_void,
+    event_binary: *const crate::ffi::abi::UNBufferRaw,
+) {
+    if event_binary.is_null() {
         return;
     }
-    let json = unsafe { std::ffi::CStr::from_ptr(event_json) }.to_string_lossy();
     let _ = unsafe {
         CenterContext::with(context, "UserNotificationCenterDelegate", |state| {
-            let Ok(payload) = serde_json::from_str::<CenterEventPayload>(&json) else {
+            let Ok(payload) = crate::binary::read::<CenterEventPayload>(event_binary) else {
                 return;
             };
 
@@ -182,15 +182,15 @@ extern "C" fn center_event_trampoline(context: *mut c_void, event_json: *const c
 
 extern "C" fn center_will_present_trampoline(
     context: *mut c_void,
-    notification_json: *const c_char,
+    notification_binary: *const crate::ffi::abi::UNBufferRaw,
 ) -> u64 {
-    if notification_json.is_null() {
+    if notification_binary.is_null() {
         return NotificationPresentationOptions::NONE.bits();
     }
-    let json = unsafe { std::ffi::CStr::from_ptr(notification_json) }.to_string_lossy();
     unsafe {
         CenterContext::with(context, "UserNotificationCenterDelegate", |state| {
-            let Ok(payload) = serde_json::from_str::<NotificationPayload>(&json) else {
+            let Ok(payload) = crate::binary::read::<NotificationPayload>(notification_binary)
+            else {
                 return NotificationPresentationOptions::NONE.bits();
             };
 
@@ -341,14 +341,14 @@ impl UserNotificationCenter {
         let mut payload = core::ptr::null_mut();
         let mut error = core::ptr::null_mut();
         let status = unsafe {
-            ffi::un_center_get_notification_settings_json(
+            ffi::un_center_get_notification_settings_binary(
                 self.raw,
                 &raw mut payload,
                 &raw mut error,
             )
         };
         if status == ffi::status::OK {
-            decode_settings_json(payload)
+            decode_settings_binary(payload)
         } else {
             Err(from_swift(status, error))
         }
@@ -359,8 +359,7 @@ impl UserNotificationCenter {
         &self,
         categories: &[NotificationCategory],
     ) -> Result<(), UserNotificationsError> {
-        let categories = encode_categories_json(categories)?;
-        let categories = to_cstring(&categories)?;
+        let categories = encode_categories_binary(categories);
         let mut error = core::ptr::null_mut();
         let status = unsafe {
             ffi::category::un_center_set_notification_categories(
@@ -383,14 +382,14 @@ impl UserNotificationCenter {
         let mut payload = core::ptr::null_mut();
         let mut error = core::ptr::null_mut();
         let status = unsafe {
-            ffi::category::un_center_get_notification_categories_json(
+            ffi::category::un_center_get_notification_categories_binary(
                 self.raw,
                 &raw mut payload,
                 &raw mut error,
             )
         };
         if status == ffi::status::OK {
-            decode_categories_json(payload)
+            decode_categories_binary(payload)
         } else {
             Err(from_swift(status, error))
         }
@@ -405,11 +404,11 @@ impl UserNotificationCenter {
         &self,
         request: &NotificationRequest,
     ) -> Result<(), UserNotificationsError> {
-        let request = encode_request_json(request)?;
-        let request = to_cstring(&request)?;
+        let request = encode_request_binary(request)?;
         let mut error = core::ptr::null_mut();
-        let status =
-            unsafe { ffi::request::un_center_add_request(self.raw, request.as_ptr(), &raw mut error) };
+        let status = unsafe {
+            ffi::request::un_center_add_request(self.raw, request.as_ptr(), &raw mut error)
+        };
         if status == ffi::status::OK {
             Ok(())
         } else {
@@ -424,14 +423,14 @@ impl UserNotificationCenter {
         let mut payload = core::ptr::null_mut();
         let mut error = core::ptr::null_mut();
         let status = unsafe {
-            ffi::request::un_center_get_pending_requests_json(
+            ffi::request::un_center_get_pending_requests_binary(
                 self.raw,
                 &raw mut payload,
                 &raw mut error,
             )
         };
         if status == ffi::status::OK {
-            decode_requests_json(payload)
+            decode_requests_binary(payload)
         } else {
             Err(from_swift(status, error))
         }
@@ -442,7 +441,7 @@ impl UserNotificationCenter {
         &self,
         identifiers: &[&str],
     ) -> Result<(), UserNotificationsError> {
-        let identifiers = encode_identifiers(identifiers)?;
+        let identifiers = encode_identifiers(identifiers);
         unsafe { ffi::request::un_center_remove_pending_requests(self.raw, identifiers.as_ptr()) };
         Ok(())
     }
@@ -457,14 +456,14 @@ impl UserNotificationCenter {
         let mut payload = core::ptr::null_mut();
         let mut error = core::ptr::null_mut();
         let status = unsafe {
-            ffi::response::un_center_get_delivered_notifications_json(
+            ffi::response::un_center_get_delivered_notifications_binary(
                 self.raw,
                 &raw mut payload,
                 &raw mut error,
             )
         };
         if status == ffi::status::OK {
-            decode_notifications_json(payload)
+            decode_notifications_binary(payload)
         } else {
             Err(from_swift(status, error))
         }
@@ -475,7 +474,7 @@ impl UserNotificationCenter {
         &self,
         identifiers: &[&str],
     ) -> Result<(), UserNotificationsError> {
-        let identifiers = encode_identifiers(identifiers)?;
+        let identifiers = encode_identifiers(identifiers);
         unsafe {
             ffi::response::un_center_remove_delivered_notifications(self.raw, identifiers.as_ptr());
         };
@@ -500,23 +499,66 @@ impl Drop for UserNotificationCenter {
     }
 }
 
-fn encode_identifiers(identifiers: &[&str]) -> Result<std::ffi::CString, UserNotificationsError> {
-    let json = serde_json::to_string(identifiers).map_err(|error| {
-        UserNotificationsError::FrameworkError(format!("failed to encode identifiers: {error}"))
-    })?;
-    to_cstring(&json)
+fn encode_identifiers(identifiers: &[&str]) -> crate::binary::Input {
+    let identifiers = identifiers
+        .iter()
+        .map(|value| (*value).to_owned())
+        .collect::<Vec<_>>();
+    crate::binary::Input::new(&identifiers)
+}
+
+impl crate::binary::Record for CenterEventPayload {
+    type Raw = crate::ffi::abi::UNCenterEventPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            event: match self.event.as_str() {
+                "didReceiveNotificationResponse" => 1,
+                "openSettingsForNotification" => 2,
+                _ => 0,
+            },
+            notification: self
+                .notification
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+            response: self.response.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = crate::binary::Record::raw(value, arena);
+                arena.keep(raw)
+            }),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            event: match raw.event {
+                0 => "unknown",
+                1 => "didReceiveNotificationResponse",
+                2 => "openSettingsForNotification",
+                _ => return Err(crate::binary::invalid_data()),
+            }
+            .to_owned(),
+            notification: unsafe { raw.notification.as_ref() }
+                .map(|value| unsafe { <NotificationPayload as crate::binary::Record>::read(value) })
+                .transpose()?,
+            response: unsafe { raw.response.as_ref() }
+                .map(|value| unsafe {
+                    <NotificationResponsePayload as crate::binary::Record>::read(value)
+                })
+                .transpose()?,
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::CString;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::time::UNIX_EPOCH;
 
     use super::*;
     use crate::content::NotificationContent;
-    use crate::notification::encode_notification_json;
+    use crate::notification::encode_notification_binary;
 
     fn sample_notification() -> Notification {
         Notification {
@@ -529,17 +571,17 @@ mod tests {
         }
     }
 
-    fn response_event_json() -> CString {
+    fn response_event_binary() -> crate::binary::Input {
         let response = NotificationResponse {
             action_identifier: "reply".into(),
             notification: sample_notification(),
             user_text: Some("hello".into()),
         };
-        let payload = serde_json::to_string(&NotificationResponsePayload::from(&response)).unwrap();
-        CString::new(format!(
-            "{{\"event\":\"didReceiveNotificationResponse\",\"notification\":null,\"response\":{payload}}}"
-        ))
-        .unwrap()
+        crate::binary::Input::new(&CenterEventPayload {
+            event: "didReceiveNotificationResponse".into(),
+            notification: None,
+            response: Some(NotificationResponsePayload::from(&response)),
+        })
     }
 
     fn counting_context(responses: &Arc<AtomicUsize>) -> CenterContext {
@@ -563,9 +605,8 @@ mod tests {
         let responses = Arc::new(AtomicUsize::new(0));
         let context = counting_context(&responses);
         let swift_reference = context.retained_ptr();
-        let event = response_event_json();
-        let notification =
-            CString::new(encode_notification_json(&sample_notification()).unwrap()).unwrap();
+        let event = response_event_binary();
+        let notification = encode_notification_binary(&sample_notification());
 
         center_event_trampoline(swift_reference, event.as_ptr());
         let presented = center_will_present_trampoline(swift_reference, notification.as_ptr());
@@ -597,10 +638,16 @@ mod tests {
         let swift_reference = context.retained_ptr();
 
         center_event_trampoline(swift_reference, core::ptr::null());
-        center_event_trampoline(swift_reference, c"not json".as_ptr());
-        center_event_trampoline(core::ptr::null_mut(), response_event_json().as_ptr());
+        let malformed = crate::ffi::abi::UNBufferRaw {
+            data: core::ptr::null(),
+            size: 0,
+            owner: core::ptr::null_mut(),
+            release: None,
+        };
+        center_event_trampoline(swift_reference, &raw const malformed);
+        center_event_trampoline(core::ptr::null_mut(), response_event_binary().as_ptr());
         assert_eq!(
-            center_will_present_trampoline(swift_reference, c"{}".as_ptr()),
+            center_will_present_trampoline(swift_reference, &raw const malformed),
             NotificationPresentationOptions::NONE.bits()
         );
         assert_eq!(responses.load(Ordering::SeqCst), 0);

@@ -1,7 +1,8 @@
+import UserNotificationsABI
 import Foundation
 import UserNotifications
 
-struct UNNotificationPayload: Codable {
+struct UNNotificationPayload {
     var date: Double
     var request: UNNotificationRequestPayload
 }

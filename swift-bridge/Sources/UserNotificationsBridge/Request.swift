@@ -1,7 +1,8 @@
+import UserNotificationsABI
 import Foundation
 import UserNotifications
 
-struct UNNotificationRequestPayload: Codable {
+struct UNNotificationRequestPayload {
     var identifier: String
     var content: UNNotificationContentPayload
     var trigger: UNNotificationTriggerPayload?
@@ -26,15 +27,15 @@ func un_request_payload(
     )
 }
 
-@_cdecl("un_request_roundtrip_json")
-public func un_request_roundtrip_json(
-    _ requestJSON: UnsafePointer<CChar>?,
+@_cdecl("un_request_roundtrip_binary")
+public func un_request_roundtrip_binary(
+    _ requestBinary: UnsafePointer<UNBufferRaw>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> UnsafeMutablePointer<CChar>? {
+) -> UnsafeMutablePointer<UNBufferRaw>? {
     do {
-        let payload = try un_decode_json(requestJSON, as: UNNotificationRequestPayload.self)
+        let payload = try un_decode_binary(requestBinary, as: UNNotificationRequestPayload.self)
         let request = try un_make_request(payload)
-        return un_string(un_encode_json(un_request_payload(request, source: payload)))
+        return un_encode_binary(un_request_payload(request, source: payload))
     } catch {
         un_write_error(errorOut, error: error)
         return nil

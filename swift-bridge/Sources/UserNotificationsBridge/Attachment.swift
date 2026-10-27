@@ -1,27 +1,47 @@
+import UserNotificationsABI
 import CoreGraphics
 import Foundation
 import UserNotifications
 
-struct UNAttachmentThumbnailClippingRectPayload: Codable {
+struct UNAttachmentThumbnailClippingRectPayload {
     var x: Double
     var y: Double
     var width: Double
     var height: Double
 }
 
-enum UNAttachmentThumbnailTimePayload: Codable {
+enum UNAttachmentThumbnailTimePayload {
     case Seconds(Double)
     case Frame(UInt64)
 }
 
-struct UNNotificationAttachmentOptionsPayload: Codable {
+extension UNAttachmentThumbnailTimePayload: UNABIValue {
+    func raw(_ arena: UNArena) -> UNAttachmentThumbnailTimePayloadRaw {
+        switch self {
+        case .Seconds(let seconds):
+            return UNAttachmentThumbnailTimePayloadRaw(tag: 1, seconds: seconds, frame: 0)
+        case .Frame(let frame):
+            return UNAttachmentThumbnailTimePayloadRaw(tag: 2, seconds: 0, frame: frame)
+        }
+    }
+
+    static func read(_ raw: UNAttachmentThumbnailTimePayloadRaw) throws -> Self {
+        switch raw.tag {
+        case 1: return .Seconds(raw.seconds)
+        case 2: return .Frame(raw.frame)
+        default: throw un_binary_error()
+        }
+    }
+}
+
+struct UNNotificationAttachmentOptionsPayload {
     var type_hint: String?
     var thumbnail_hidden: Bool
     var thumbnail_clipping_rect: UNAttachmentThumbnailClippingRectPayload?
     var thumbnail_time: UNAttachmentThumbnailTimePayload?
 }
 
-struct UNNotificationAttachmentPayload: Codable {
+struct UNNotificationAttachmentPayload {
     var identifier: String
     var file_path: String
     var attachment_type: String?
@@ -96,15 +116,15 @@ func un_attachment_payload(
     )
 }
 
-@_cdecl("un_attachment_roundtrip_json")
-public func un_attachment_roundtrip_json(
-    _ attachmentJSON: UnsafePointer<CChar>?,
+@_cdecl("un_attachment_roundtrip_binary")
+public func un_attachment_roundtrip_binary(
+    _ attachmentBinary: UnsafePointer<UNBufferRaw>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> UnsafeMutablePointer<CChar>? {
+) -> UnsafeMutablePointer<UNBufferRaw>? {
     do {
-        let payload = try un_decode_json(attachmentJSON, as: UNNotificationAttachmentPayload.self)
+        let payload = try un_decode_binary(attachmentBinary, as: UNNotificationAttachmentPayload.self)
         let attachment = try un_make_attachment(payload)
-        return un_string(un_encode_json(un_attachment_payload(attachment, source: payload)))
+        return un_encode_binary(un_attachment_payload(attachment, source: payload))
     } catch {
         un_write_error(errorOut, error: error)
         return nil

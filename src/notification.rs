@@ -1,10 +1,7 @@
-use core::ffi::c_char;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use serde::{Deserialize, Serialize};
-
+use crate::binary::decode_binary;
 use crate::error::UserNotificationsError;
-use crate::private::decode_json;
 use crate::request::{NotificationRequest, NotificationRequestPayload};
 
 /// Wraps `UNNotification`.
@@ -16,7 +13,7 @@ pub struct Notification {
     pub request: NotificationRequest,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct NotificationPayload {
     date: f64,
     request: NotificationRequestPayload,
@@ -47,26 +44,38 @@ impl From<NotificationPayload> for Notification {
     }
 }
 
-pub(crate) fn encode_notification_json(
-    notification: &Notification,
-) -> Result<String, UserNotificationsError> {
-    serde_json::to_string(&NotificationPayload::from(notification)).map_err(|error| {
-        UserNotificationsError::FrameworkError(format!(
-            "failed to encode notification payload: {error}",
-        ))
-    })
+pub(crate) fn encode_notification_binary(notification: &Notification) -> crate::binary::Input {
+    crate::binary::Input::new(&NotificationPayload::from(notification))
 }
 
 #[allow(dead_code)]
-pub(crate) fn decode_notification_json(
-    ptr: *mut c_char,
+pub(crate) fn decode_notification_binary(
+    ptr: *mut crate::ffi::abi::UNBufferRaw,
 ) -> Result<Notification, UserNotificationsError> {
-    decode_json::<NotificationPayload>(ptr).map(Into::into)
+    decode_binary::<NotificationPayload>(ptr).map(Into::into)
 }
 
-pub(crate) fn decode_notifications_json(
-    ptr: *mut c_char,
+pub(crate) fn decode_notifications_binary(
+    ptr: *mut crate::ffi::abi::UNBufferRaw,
 ) -> Result<Vec<Notification>, UserNotificationsError> {
-    decode_json::<Vec<NotificationPayload>>(ptr)
+    decode_binary::<Vec<NotificationPayload>>(ptr)
         .map(|payloads| payloads.into_iter().map(Into::into).collect())
+}
+
+impl crate::binary::Record for NotificationPayload {
+    type Raw = crate::ffi::abi::UNNotificationPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            date: self.date,
+            request: crate::binary::Record::raw(&self.request, arena),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            date: raw.date,
+            request: unsafe {
+                <NotificationRequestPayload as crate::binary::Record>::read(&raw.request)
+            }?,
+        })
+    }
 }

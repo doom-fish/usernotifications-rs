@@ -1,24 +1,21 @@
-use core::ffi::c_char;
-
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use crate::{NotificationUserInfo, NotificationValue};
 
 use crate::attachment::{NotificationAttachment, NotificationAttachmentPayload};
+use crate::binary::decode_binary;
 use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
-use crate::private::{decode_json, to_cstring};
 
 mod content_provider_private {
     pub trait Sealed {}
 }
 
 /// Wraps localized string inputs consumed by `UNMutableNotificationContent` text properties.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalizedNotificationString {
     /// The key.
     pub key: String,
     /// The arguments.
-    pub arguments: Vec<Value>,
+    pub arguments: Vec<NotificationValue>,
 }
 
 impl LocalizedNotificationString {
@@ -33,7 +30,7 @@ impl LocalizedNotificationString {
 
     /// Adds a localization argument.
     #[must_use]
-    pub fn with_argument(mut self, argument: impl Into<Value>) -> Self {
+    pub fn with_argument(mut self, argument: impl Into<NotificationValue>) -> Self {
         self.arguments.push(argument.into());
         self
     }
@@ -89,7 +86,7 @@ pub enum NotificationSound {
 }
 
 /// Wraps the handle-type values used by `UNNotificationAttributedMessageContext`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum NotificationMessagePersonHandleType {
     /// Represents an unknown handle type.
@@ -113,7 +110,7 @@ impl NotificationMessagePersonHandleType {
 }
 
 /// Wraps the outgoing message type used by `UNNotificationAttributedMessageContext`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum NotificationMessageType {
     /// Represents an unknown outgoing message type.
@@ -137,7 +134,7 @@ impl NotificationMessageType {
 }
 
 /// Wraps a person record used with `UNNotificationAttributedMessageContext`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NotificationMessagePerson {
     /// The handle.
     pub handle: String,
@@ -200,7 +197,7 @@ impl NotificationMessagePerson {
 }
 
 /// Wraps `UNNotificationAttributedMessageContext`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NotificationAttributedMessageContext {
     /// The sender.
     pub sender: Option<NotificationMessagePerson>,
@@ -302,14 +299,14 @@ impl NotificationAttributedMessageContext {
 /// Sealed trait for values accepted by `UNMutableNotificationContent::updating(from:)`.
 pub trait NotificationContentProviding: content_provider_private::Sealed {
     #[doc(hidden)]
-    fn encode_provider_json(&self) -> Result<String, UserNotificationsError>;
+    fn attributed_message_context(&self) -> &NotificationAttributedMessageContext;
 }
 
 impl content_provider_private::Sealed for NotificationAttributedMessageContext {}
 
 impl NotificationContentProviding for NotificationAttributedMessageContext {
-    fn encode_provider_json(&self) -> Result<String, UserNotificationsError> {
-        encode_content_provider_json(&NotificationContentProviderPayload::from(self))
+    fn attributed_message_context(&self) -> &NotificationAttributedMessageContext {
+        self
     }
 }
 
@@ -329,7 +326,7 @@ pub struct NotificationContent {
     /// The thread identifier.
     pub thread_identifier: String,
     /// The user info.
-    pub user_info: Option<Value>,
+    pub user_info: Option<NotificationUserInfo>,
     /// The sound.
     pub sound: Option<NotificationSound>,
     /// The attachments.
@@ -396,7 +393,7 @@ impl NotificationContent {
 
     /// Sets user info.
     #[must_use]
-    pub fn with_user_info(mut self, user_info: Value) -> Self {
+    pub fn with_user_info(mut self, user_info: NotificationUserInfo) -> Self {
         self.user_info = Some(user_info);
         self
     }
@@ -496,15 +493,15 @@ impl NotificationContent {
 
     /// Round-trips this content through the Swift bridge.
     pub fn bridge_roundtrip(&self) -> Result<Self, UserNotificationsError> {
-        let content = encode_content_json(self)?;
-        let content = to_cstring(&content)?;
+        let content = encode_content_binary(self);
+
         let mut error = core::ptr::null_mut();
         let payload =
-            unsafe { ffi::content::un_content_roundtrip_json(content.as_ptr(), &raw mut error) };
+            unsafe { ffi::content::un_content_roundtrip_binary(content.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
-            decode_content_json(payload)
+            decode_content_binary(payload)
         }
     }
 
@@ -513,13 +510,14 @@ impl NotificationContent {
         &self,
         provider: &P,
     ) -> Result<Self, UserNotificationsError> {
-        let content = encode_content_json(self)?;
-        let provider = provider.encode_provider_json()?;
-        let content = to_cstring(&content)?;
-        let provider = to_cstring(&provider)?;
+        let content = encode_content_binary(self);
+        let provider = crate::binary::Input::new(&NotificationContentProviderPayload::from(
+            provider.attributed_message_context(),
+        ));
+
         let mut error = core::ptr::null_mut();
         let payload = unsafe {
-            ffi::content::un_content_updating_with_provider_json(
+            ffi::content::un_content_updating_with_provider_binary(
                 content.as_ptr(),
                 provider.as_ptr(),
                 &raw mut error,
@@ -528,12 +526,12 @@ impl NotificationContent {
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
-            decode_content_json(payload)
+            decode_content_binary(payload)
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct NotificationSoundPayload {
     kind: String,
     name: Option<String>,
@@ -597,7 +595,7 @@ impl From<NotificationSoundPayload> for NotificationSound {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct NotificationContentPayload {
     title: String,
     subtitle: String,
@@ -605,7 +603,7 @@ pub(crate) struct NotificationContentPayload {
     badge: Option<i64>,
     category_identifier: String,
     thread_identifier: String,
-    user_info: Option<Value>,
+    user_info: Option<NotificationUserInfo>,
     sound: Option<NotificationSoundPayload>,
     attachments: Vec<NotificationAttachmentPayload>,
     summary_argument: String,
@@ -675,7 +673,7 @@ impl From<NotificationContentPayload> for NotificationContent {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct NotificationMessagePersonPayload {
     handle: String,
     handle_type: i32,
@@ -698,7 +696,7 @@ impl From<&NotificationMessagePerson> for NotificationMessagePersonPayload {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct NotificationAttributedMessageContextPayload {
     sender: Option<NotificationMessagePersonPayload>,
     recipients: Vec<NotificationMessagePersonPayload>,
@@ -732,7 +730,7 @@ impl From<&NotificationAttributedMessageContext> for NotificationAttributedMessa
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct NotificationContentProviderPayload {
     kind: String,
     attributed_message_context: Option<NotificationAttributedMessageContextPayload>,
@@ -749,30 +747,360 @@ impl From<&NotificationAttributedMessageContext> for NotificationContentProvider
     }
 }
 
-fn encode_content_provider_json(
-    provider: &NotificationContentProviderPayload,
-) -> Result<String, UserNotificationsError> {
-    serde_json::to_string(provider).map_err(|error| {
-        UserNotificationsError::FrameworkError(format!(
-            "failed to encode notification content provider: {error}",
-        ))
-    })
+pub(crate) fn encode_content_binary(content: &NotificationContent) -> crate::binary::Input {
+    crate::binary::Input::new(&NotificationContentPayload::from(content))
 }
 
-pub(crate) fn encode_content_json(
-    content: &NotificationContent,
-) -> Result<String, UserNotificationsError> {
-    serde_json::to_string(&NotificationContentPayload::from(content)).map_err(|error| {
-        UserNotificationsError::FrameworkError(format!(
-            "failed to encode notification content: {error}",
-        ))
-    })
-}
-
-pub(crate) fn decode_content_json(
-    ptr: *mut c_char,
+pub(crate) fn decode_content_binary(
+    ptr: *mut crate::ffi::abi::UNBufferRaw,
 ) -> Result<NotificationContent, UserNotificationsError> {
-    decode_json::<NotificationContentPayload>(ptr).map(Into::into)
+    decode_binary::<NotificationContentPayload>(ptr).map(Into::into)
+}
+
+impl crate::binary::Record for LocalizedNotificationString {
+    type Raw = crate::ffi::abi::UNLocalizedNotificationStringRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            key: crate::binary::Record::raw(&self.key, arena),
+            arguments: crate::binary::Record::raw(&self.arguments, arena),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            key: unsafe { <String as crate::binary::Record>::read(&raw.key) }?,
+            arguments: unsafe {
+                <Vec<NotificationValue> as crate::binary::Record>::read(&raw.arguments)
+            }?,
+        })
+    }
+}
+
+impl crate::binary::Record for NotificationSoundPayload {
+    type Raw = crate::ffi::abi::UNNotificationSoundPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            kind: match self.kind.as_str() {
+                "default" => 1,
+                "defaultCritical" => 2,
+                "defaultCriticalWithVolume" => 3,
+                "named" => 4,
+                "criticalNamed" => 5,
+                _ => 0,
+            },
+            name: self.name.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = crate::binary::Record::raw(value, arena);
+                arena.keep(raw)
+            }),
+            volume: self.volume.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = *value;
+                arena.keep(raw)
+            }),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            kind: match raw.kind {
+                0 => "unknown",
+                1 => "default",
+                2 => "defaultCritical",
+                3 => "defaultCriticalWithVolume",
+                4 => "named",
+                5 => "criticalNamed",
+                _ => return Err(crate::binary::invalid_data()),
+            }
+            .to_owned(),
+            name: unsafe { raw.name.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+            volume: unsafe { raw.volume.as_ref() }.copied(),
+        })
+    }
+}
+
+impl crate::binary::Record for NotificationContentPayload {
+    type Raw = crate::ffi::abi::UNNotificationContentPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            title: crate::binary::Record::raw(&self.title, arena),
+            subtitle: crate::binary::Record::raw(&self.subtitle, arena),
+            body: crate::binary::Record::raw(&self.body, arena),
+            badge: self.badge.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = *value;
+                arena.keep(raw)
+            }),
+            category_identifier: crate::binary::Record::raw(&self.category_identifier, arena),
+            thread_identifier: crate::binary::Record::raw(&self.thread_identifier, arena),
+            user_info: self.user_info.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = crate::binary::Record::raw(value, arena);
+                arena.keep(raw)
+            }),
+            sound: self.sound.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = crate::binary::Record::raw(value, arena);
+                arena.keep(raw)
+            }),
+            attachments: crate::binary::Record::raw(&self.attachments, arena),
+            summary_argument: crate::binary::Record::raw(&self.summary_argument, arena),
+            summary_argument_count: self.summary_argument_count,
+            interruption_level: self.interruption_level.as_ref().map_or(
+                core::ptr::null(),
+                |value| {
+                    let raw = *value;
+                    arena.keep(raw)
+                },
+            ),
+            relevance_score: self
+                .relevance_score
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = *value;
+                    arena.keep(raw)
+                }),
+            filter_criteria: self
+                .filter_criteria
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+            localized_title: self
+                .localized_title
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+            localized_subtitle: self.localized_subtitle.as_ref().map_or(
+                core::ptr::null(),
+                |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                },
+            ),
+            localized_body: self
+                .localized_body
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+            localized_summary_argument: self.localized_summary_argument.as_ref().map_or(
+                core::ptr::null(),
+                |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                },
+            ),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            title: unsafe { <String as crate::binary::Record>::read(&raw.title) }?,
+            subtitle: unsafe { <String as crate::binary::Record>::read(&raw.subtitle) }?,
+            body: unsafe { <String as crate::binary::Record>::read(&raw.body) }?,
+            badge: unsafe { raw.badge.as_ref() }.copied(),
+            category_identifier: unsafe {
+                <String as crate::binary::Record>::read(&raw.category_identifier)
+            }?,
+            thread_identifier: unsafe {
+                <String as crate::binary::Record>::read(&raw.thread_identifier)
+            }?,
+            user_info: unsafe { raw.user_info.as_ref() }
+                .map(|value| unsafe {
+                    <NotificationUserInfo as crate::binary::Record>::read(value)
+                })
+                .transpose()?,
+            sound: unsafe { raw.sound.as_ref() }
+                .map(|value| unsafe {
+                    <NotificationSoundPayload as crate::binary::Record>::read(value)
+                })
+                .transpose()?,
+            attachments: unsafe {
+                <Vec<NotificationAttachmentPayload> as crate::binary::Record>::read(
+                    &raw.attachments,
+                )
+            }?,
+            summary_argument: unsafe {
+                <String as crate::binary::Record>::read(&raw.summary_argument)
+            }?,
+            summary_argument_count: raw.summary_argument_count,
+            interruption_level: unsafe { raw.interruption_level.as_ref() }.copied(),
+            relevance_score: unsafe { raw.relevance_score.as_ref() }.copied(),
+            filter_criteria: unsafe { raw.filter_criteria.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+            localized_title: unsafe { raw.localized_title.as_ref() }
+                .map(|value| unsafe {
+                    <LocalizedNotificationString as crate::binary::Record>::read(value)
+                })
+                .transpose()?,
+            localized_subtitle: unsafe { raw.localized_subtitle.as_ref() }
+                .map(|value| unsafe {
+                    <LocalizedNotificationString as crate::binary::Record>::read(value)
+                })
+                .transpose()?,
+            localized_body: unsafe { raw.localized_body.as_ref() }
+                .map(|value| unsafe {
+                    <LocalizedNotificationString as crate::binary::Record>::read(value)
+                })
+                .transpose()?,
+            localized_summary_argument: unsafe { raw.localized_summary_argument.as_ref() }
+                .map(|value| unsafe {
+                    <LocalizedNotificationString as crate::binary::Record>::read(value)
+                })
+                .transpose()?,
+        })
+    }
+}
+
+impl crate::binary::Record for NotificationMessagePersonPayload {
+    type Raw = crate::ffi::abi::UNNotificationMessagePersonPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            handle: crate::binary::Record::raw(&self.handle, arena),
+            handle_type: self.handle_type,
+            display_name: self
+                .display_name
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+            contact_identifier: self.contact_identifier.as_ref().map_or(
+                core::ptr::null(),
+                |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                },
+            ),
+            custom_identifier: self
+                .custom_identifier
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+            is_me: u8::from(self.is_me),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            handle: unsafe { <String as crate::binary::Record>::read(&raw.handle) }?,
+            handle_type: raw.handle_type,
+            display_name: unsafe { raw.display_name.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+            contact_identifier: unsafe { raw.contact_identifier.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+            custom_identifier: unsafe { raw.custom_identifier.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+            is_me: raw.is_me != 0,
+        })
+    }
+}
+
+impl crate::binary::Record for NotificationAttributedMessageContextPayload {
+    type Raw = crate::ffi::abi::UNNotificationAttributedMessageContextPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            sender: self.sender.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = crate::binary::Record::raw(value, arena);
+                arena.keep(raw)
+            }),
+            recipients: crate::binary::Record::raw(&self.recipients, arena),
+            attributed_content: crate::binary::Record::raw(&self.attributed_content, arena),
+            content: self.content.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = crate::binary::Record::raw(value, arena);
+                arena.keep(raw)
+            }),
+            outgoing_message_type: self.outgoing_message_type,
+            conversation_identifier: self.conversation_identifier.as_ref().map_or(
+                core::ptr::null(),
+                |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                },
+            ),
+            service_name: self
+                .service_name
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+            group_name: self.group_name.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = crate::binary::Record::raw(value, arena);
+                arena.keep(raw)
+            }),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            sender: unsafe { raw.sender.as_ref() }
+                .map(|value| unsafe {
+                    <NotificationMessagePersonPayload as crate::binary::Record>::read(value)
+                })
+                .transpose()?,
+            recipients: unsafe {
+                <Vec<NotificationMessagePersonPayload> as crate::binary::Record>::read(
+                    &raw.recipients,
+                )
+            }?,
+            attributed_content: unsafe {
+                <String as crate::binary::Record>::read(&raw.attributed_content)
+            }?,
+            content: unsafe { raw.content.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+            outgoing_message_type: raw.outgoing_message_type,
+            conversation_identifier: unsafe { raw.conversation_identifier.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+            service_name: unsafe { raw.service_name.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+            group_name: unsafe { raw.group_name.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+        })
+    }
+}
+
+impl crate::binary::Record for NotificationContentProviderPayload {
+    type Raw = crate::ffi::abi::UNNotificationContentProviderPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            kind: match self.kind.as_str() {
+                "attributedMessageContext" => 1,
+                _ => 0,
+            },
+            attributed_message_context: self.attributed_message_context.as_ref().map_or(
+                core::ptr::null(),
+                |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                },
+            ),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            kind: match raw.kind {
+                0 => "unknown",
+                1 => "attributedMessageContext",
+                _ => return Err(crate::binary::invalid_data()),
+            }
+            .to_owned(),
+            attributed_message_context: unsafe { raw.attributed_message_context.as_ref() }
+                .map(|value| unsafe {
+                    <NotificationAttributedMessageContextPayload as crate::binary::Record>::read(
+                        value,
+                    )
+                })
+                .transpose()?,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -781,7 +1109,7 @@ mod tests {
         LocalizedNotificationString, NotificationContent, NotificationContentPayload,
         NotificationInterruptionLevel, NotificationSound,
     };
-    use serde_json::json;
+    use crate::{NotificationUserInfo, NotificationValue};
 
     #[test]
     fn localized_notification_string_round_trip_preserves_key_and_arguments() {
@@ -789,12 +1117,16 @@ mod tests {
             .with_argument("Alex")
             .with_argument(3);
 
-        let encoded = serde_json::to_string(&localized).unwrap();
-        let roundtrip: LocalizedNotificationString = serde_json::from_str(&encoded).unwrap();
+        let encoded = crate::binary::Input::new(&localized);
+        let roundtrip: LocalizedNotificationString =
+            unsafe { crate::binary::read(encoded.as_ptr()) }.unwrap();
 
         assert_eq!(roundtrip, localized);
         assert_eq!(roundtrip.key, "TITLE_KEY");
-        assert_eq!(roundtrip.arguments, vec![json!("Alex"), json!(3)]);
+        assert_eq!(
+            roundtrip.arguments,
+            vec![NotificationValue::from("Alex"), NotificationValue::from(3)]
+        );
     }
 
     #[test]
@@ -811,7 +1143,10 @@ mod tests {
         assert!(content.badge.is_none());
         assert!(content.user_info.is_none());
         assert!(content.sound.is_none());
-        assert_eq!(content.attachments, [] as [crate::attachment::NotificationAttachment; 0]);
+        assert_eq!(
+            content.attachments,
+            [] as [crate::attachment::NotificationAttachment; 0]
+        );
         assert!(content.interruption_level.is_none());
         assert!(content.relevance_score.is_none());
         assert!(content.filter_criteria.is_none());
@@ -833,7 +1168,7 @@ mod tests {
             .with_badge(7)
             .with_category_identifier("messages")
             .with_thread_identifier("thread-1")
-            .with_user_info(json!({ "unread": 7 }))
+            .with_user_info(NotificationUserInfo::from([("unread".into(), 7.into())]))
             .with_sound(NotificationSound::Named("ding.aiff".into()))
             .with_summary_argument("Messages")
             .with_summary_argument_count(7)
@@ -849,7 +1184,10 @@ mod tests {
         assert_eq!(content.badge, Some(7));
         assert_eq!(content.category_identifier, "messages");
         assert_eq!(content.thread_identifier, "thread-1");
-        assert_eq!(content.user_info, Some(json!({ "unread": 7 })));
+        assert_eq!(
+            content.user_info,
+            Some(NotificationUserInfo::from([("unread".into(), 7.into())]))
+        );
         assert_eq!(
             content.sound,
             Some(NotificationSound::Named("ding.aiff".into()))
@@ -881,7 +1219,7 @@ mod tests {
             .with_badge(3)
             .with_category_identifier("inbox")
             .with_thread_identifier("thread-42")
-            .with_user_info(json!({ "id": 42 }))
+            .with_user_info(NotificationUserInfo::from([("id".into(), 42.into())]))
             .with_sound(NotificationSound::CriticalNamed {
                 name: "alert.aiff".into(),
                 volume: Some(0.75),

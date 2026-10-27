@@ -1,3 +1,4 @@
+import UserNotificationsABI
 import Dispatch
 import Foundation
 import UserNotifications
@@ -5,9 +6,9 @@ import UserNotifications
 public typealias UNServiceExtensionReceiveCallback =
     @convention(c) (
         UnsafeMutableRawPointer?,
-        UnsafePointer<CChar>?,
+        UnsafePointer<UNBufferRaw>?,
         UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-    ) -> UnsafeMutablePointer<CChar>?
+    ) -> UnsafeMutablePointer<UNBufferRaw>?
 public typealias UNServiceExtensionExpireCallback =
     @convention(c) (UnsafeMutableRawPointer?) -> Void
 
@@ -39,12 +40,12 @@ private final class UNRustNotificationServiceExtension: UNNotificationServiceExt
             return
         }
 
-        let requestJSON = un_encode_json(un_request_payload(request))
+        let requestBinary = un_encode_binary(un_request_payload(request))
+        defer { un_release_binary(requestBinary) }
         var callbackError: UnsafeMutablePointer<CChar>?
-        let contentJSON = requestJSON.withCString { callback in
-            receiveCallback(userInfo, callback, &callbackError)
-        }
+        let contentBinary = receiveCallback(userInfo, requestBinary, &callbackError)
         defer {
+            un_release_binary(contentBinary)
             if let callbackError {
                 free(callbackError)
             }
@@ -57,15 +58,13 @@ private final class UNRustNotificationServiceExtension: UNNotificationServiceExt
             return
         }
 
-        guard let contentJSON else {
+        guard let contentBinary else {
             lastDeliveredContent = request.content
             contentHandler(request.content)
             return
         }
-        defer { free(contentJSON) }
-
         do {
-            let payload = try un_decode_json(contentJSON, as: UNNotificationContentPayload.self)
+            let payload = try un_decode_binary(contentBinary, as: UNNotificationContentPayload.self)
             let content = try un_make_content(payload)
             lastDeliveredContent = content
             contentHandler(content)
@@ -99,19 +98,19 @@ public func un_service_extension_simulator_create(
     return UNR_OK
 }
 
-@_cdecl("un_service_extension_simulator_receive_request_json")
-public func un_service_extension_simulator_receive_request_json(
+@_cdecl("un_service_extension_simulator_receive_request_binary")
+public func un_service_extension_simulator_receive_request_binary(
     _ simulatorPtr: UnsafeMutableRawPointer?,
-    _ requestJSON: UnsafePointer<CChar>?,
+    _ requestBinary: UnsafePointer<UNBufferRaw>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> UnsafeMutablePointer<CChar>? {
+) -> UnsafeMutablePointer<UNBufferRaw>? {
     guard let simulatorPtr else {
         un_write_error(errorOut, "service extension simulator must not be null")
         return nil
     }
 
     do {
-        let payload = try un_decode_json(requestJSON, as: UNNotificationRequestPayload.self)
+        let payload = try un_decode_binary(requestBinary, as: UNNotificationRequestPayload.self)
         let request = try un_make_request(payload)
         let simulator: UNRustNotificationServiceExtension = un_borrow(simulatorPtr)
         simulator.pendingErrorMessage = nil
@@ -139,7 +138,7 @@ public func un_service_extension_simulator_receive_request_json(
             un_write_error(errorOut, "service extension did not produce content")
             return nil
         }
-        return un_string(un_encode_json(un_content_payload(deliveredContent)))
+        return un_encode_binary(un_content_payload(deliveredContent))
     } catch {
         un_write_error(errorOut, error: error)
         return nil

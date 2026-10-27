@@ -1,12 +1,13 @@
+import UserNotificationsABI
 import AppKit
 import Foundation
 import UserNotifications
 import UserNotificationsUI
 
 public typealias UNContentExtensionNotificationCallback =
-    @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> Void
+    @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<UNBufferRaw>?) -> Void
 public typealias UNContentExtensionResponseCallback =
-    @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> UInt64
+    @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<UNBufferRaw>?) -> UInt64
 public typealias UNContentExtensionSimpleCallback =
     @convention(c) (UnsafeMutableRawPointer?) -> Void
 
@@ -35,7 +36,7 @@ private func un_content_extension_context_box(
 @_cdecl("un_content_extension_context_set_notification_actions")
 public func un_content_extension_context_set_notification_actions(
     _ contextPtr: UnsafeMutableRawPointer?,
-    _ actionsJSON: UnsafePointer<CChar>?,
+    _ actionsBinary: UnsafePointer<UNBufferRaw>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
     guard let box = un_content_extension_context_box(contextPtr) else {
@@ -44,7 +45,7 @@ public func un_content_extension_context_set_notification_actions(
     }
 
     do {
-        let payloads = try un_decode_json(actionsJSON, as: [UNNotificationActionPayload].self)
+        let payloads = try un_decode_binary(actionsBinary, as: [UNNotificationActionPayload].self)
         box.notificationActions = payloads.map(un_make_action)
         return UNR_OK
     } catch {
@@ -53,17 +54,17 @@ public func un_content_extension_context_set_notification_actions(
     }
 }
 
-@_cdecl("un_content_extension_context_get_notification_actions_json")
-public func un_content_extension_context_get_notification_actions_json(
+@_cdecl("un_content_extension_context_get_notification_actions_binary")
+public func un_content_extension_context_get_notification_actions_binary(
     _ contextPtr: UnsafeMutableRawPointer?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> UnsafeMutablePointer<CChar>? {
+) -> UnsafeMutablePointer<UNBufferRaw>? {
     guard let box = un_content_extension_context_box(contextPtr) else {
         un_write_error(errorOut, "notification content extension context must not be null")
         return nil
     }
 
-    return un_string(un_encode_json(box.notificationActions.map { un_action_payload($0) }))
+    return un_encode_binary(box.notificationActions.map { un_action_payload($0) })
 }
 
 @_cdecl("un_content_extension_context_perform_default_action")
@@ -119,16 +120,18 @@ private final class UNRustNotificationContentExtensionHost: NSObject, UNNotifica
 
     func notify(_ payload: UNNotificationPayload) {
         guard let notificationCallback else { return }
-        let json = un_encode_json(payload)
-        json.withCString { notificationCallback(userInfo, $0) }
+        let buffer = un_encode_binary(payload)
+        defer { un_release_binary(buffer) }
+        notificationCallback(userInfo, buffer)
     }
 
     func respond(_ payload: UNNotificationResponsePayload) -> UInt64 {
         guard let responseCallback else {
             return UInt64(UNNotificationContentExtensionResponseOption.dismissAndForwardAction.rawValue)
         }
-        let json = un_encode_json(payload)
-        return json.withCString { responseCallback(userInfo, $0) }
+        let buffer = un_encode_binary(payload)
+        defer { un_release_binary(buffer) }
+        return responseCallback(userInfo, buffer)
     }
 
     func didReceive(_ notification: UNNotification) {
@@ -279,10 +282,10 @@ public func un_content_extension_simulator_get_media_play_pause_button_tint_colo
     return true
 }
 
-@_cdecl("un_content_extension_simulator_receive_notification_json")
-public func un_content_extension_simulator_receive_notification_json(
+@_cdecl("un_content_extension_simulator_receive_notification_binary")
+public func un_content_extension_simulator_receive_notification_binary(
     _ simulatorPtr: UnsafeMutableRawPointer?,
-    _ notificationJSON: UnsafePointer<CChar>?,
+    _ notificationBinary: UnsafePointer<UNBufferRaw>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
     guard let host = un_content_extension_host(simulatorPtr) else {
@@ -291,7 +294,7 @@ public func un_content_extension_simulator_receive_notification_json(
     }
 
     do {
-        let payload = try un_decode_json(notificationJSON, as: UNNotificationPayload.self)
+        let payload = try un_decode_binary(notificationBinary, as: UNNotificationPayload.self)
         host.notify(payload)
         return UNR_OK
     } catch {
@@ -300,10 +303,10 @@ public func un_content_extension_simulator_receive_notification_json(
     }
 }
 
-@_cdecl("un_content_extension_simulator_receive_response_json")
-public func un_content_extension_simulator_receive_response_json(
+@_cdecl("un_content_extension_simulator_receive_response_binary")
+public func un_content_extension_simulator_receive_response_binary(
     _ simulatorPtr: UnsafeMutableRawPointer?,
-    _ responseJSON: UnsafePointer<CChar>?,
+    _ responseBinary: UnsafePointer<UNBufferRaw>?,
     _ outOption: UnsafeMutablePointer<UInt64>,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
@@ -313,7 +316,7 @@ public func un_content_extension_simulator_receive_response_json(
     }
 
     do {
-        let payload = try un_decode_json(responseJSON, as: UNNotificationResponsePayload.self)
+        let payload = try un_decode_binary(responseBinary, as: UNNotificationResponsePayload.self)
         outOption.pointee = host.respond(payload)
         return UNR_OK
     } catch {

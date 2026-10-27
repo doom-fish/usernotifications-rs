@@ -1,12 +1,13 @@
+import UserNotificationsABI
 import Foundation
 import UserNotifications
 
-struct UNNotificationActionIconPayload: Codable {
+struct UNNotificationActionIconPayload {
     var kind: String
     var name: String?
 }
 
-struct UNNotificationActionPayload: Codable {
+struct UNNotificationActionPayload {
     var identifier: String
     var title: String
     var options: UInt64
@@ -111,15 +112,15 @@ func un_action_payload(
     return payload
 }
 
-@_cdecl("un_action_roundtrip_json")
-public func un_action_roundtrip_json(
-    _ actionJSON: UnsafePointer<CChar>?,
+@_cdecl("un_action_roundtrip_binary")
+public func un_action_roundtrip_binary(
+    _ actionBinary: UnsafePointer<UNBufferRaw>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> UnsafeMutablePointer<CChar>? {
+) -> UnsafeMutablePointer<UNBufferRaw>? {
     do {
-        let payload = try un_decode_json(actionJSON, as: UNNotificationActionPayload.self)
+        let payload = try un_decode_binary(actionBinary, as: UNNotificationActionPayload.self)
         let action = un_make_action(payload)
-        return un_string(un_encode_json(un_action_payload(action, source: payload)))
+        return un_encode_binary(un_action_payload(action, source: payload))
     } catch {
         un_write_error(errorOut, error: error)
         return nil

@@ -1,13 +1,10 @@
-use core::ffi::c_char;
 use std::sync::OnceLock;
 
-use serde::{Deserialize, Serialize};
-
+use crate::binary::decode_binary;
 use crate::error::{take_owned_c_string, UserNotificationsError};
 use crate::ffi;
 use crate::notification::{Notification, NotificationPayload};
 use crate::option_set::raw_option_set;
-use crate::private::decode_json;
 
 raw_option_set!(NotificationPresentationOptions);
 
@@ -51,7 +48,7 @@ impl NotificationResponse {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct NotificationResponsePayload {
     action_identifier: String,
     notification: NotificationPayload,
@@ -78,21 +75,15 @@ impl From<NotificationResponsePayload> for NotificationResponse {
     }
 }
 
-pub(crate) fn encode_response_json(
-    response: &NotificationResponse,
-) -> Result<String, UserNotificationsError> {
-    serde_json::to_string(&NotificationResponsePayload::from(response)).map_err(|error| {
-        UserNotificationsError::FrameworkError(format!(
-            "failed to encode notification response: {error}",
-        ))
-    })
+pub(crate) fn encode_response_binary(response: &NotificationResponse) -> crate::binary::Input {
+    crate::binary::Input::new(&NotificationResponsePayload::from(response))
 }
 
 #[allow(dead_code)]
-pub(crate) fn decode_response_json(
-    ptr: *mut c_char,
+pub(crate) fn decode_response_binary(
+    ptr: *mut crate::ffi::abi::UNBufferRaw,
 ) -> Result<NotificationResponse, UserNotificationsError> {
-    decode_json::<NotificationResponsePayload>(ptr).map(Into::into)
+    decode_binary::<NotificationResponsePayload>(ptr).map(Into::into)
 }
 
 /// Returns `UNNotificationDefaultActionIdentifier`.
@@ -115,6 +106,33 @@ pub fn dismiss_action_identifier() -> &'static str {
             take_owned_c_string(ffi::response::un_response_get_dismiss_action_identifier())
         })
         .as_str()
+}
+
+impl crate::binary::Record for NotificationResponsePayload {
+    type Raw = crate::ffi::abi::UNNotificationResponsePayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            action_identifier: crate::binary::Record::raw(&self.action_identifier, arena),
+            notification: crate::binary::Record::raw(&self.notification, arena),
+            user_text: self.user_text.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = crate::binary::Record::raw(value, arena);
+                arena.keep(raw)
+            }),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            action_identifier: unsafe {
+                <String as crate::binary::Record>::read(&raw.action_identifier)
+            }?,
+            notification: unsafe {
+                <NotificationPayload as crate::binary::Record>::read(&raw.notification)
+            }?,
+            user_text: unsafe { raw.user_text.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+        })
+    }
 }
 
 #[cfg(test)]

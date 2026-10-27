@@ -1,7 +1,8 @@
+import UserNotificationsABI
 import Foundation
 import UserNotifications
 
-struct UNNotificationSettingsPayload: Codable {
+struct UNNotificationSettingsPayload {
     var authorization_status: Int32
     var sound_setting: Int32
     var badge_setting: Int32

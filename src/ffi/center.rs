@@ -1,7 +1,8 @@
+use crate::ffi::abi::UNBufferRaw;
 use core::ffi::{c_char, c_void};
 
-pub type CenterEventCallback = unsafe extern "C" fn(*mut c_void, *const c_char);
-pub type CenterWillPresentCallback = unsafe extern "C" fn(*mut c_void, *const c_char) -> u64;
+pub type CenterEventCallback = unsafe extern "C" fn(*mut c_void, *const UNBufferRaw);
+pub type CenterWillPresentCallback = unsafe extern "C" fn(*mut c_void, *const UNBufferRaw) -> u64;
 pub type ContextCallback = unsafe extern "C" fn(*mut c_void);
 
 unsafe extern "C" {

@@ -1,6 +1,8 @@
 # UserNotifications SDK coverage
 
-Version 0.4.4 replaces the `libc` dependency with direct system C declarations.
+Version 0.5.0 replaces all JSON bridge payloads with binary C records.
+The bridge maps each field explicitly and imports its C header in Swift.
+User info uses string keys and typed values, with native data and date support.
 The framework coverage does not change.
 
 `usernotifications-rs` v0.2.1 was audited against the macOS `UserNotifications` and `UserNotificationsUI` headers in the active Xcode SDK. Every macOS-facing area is accounted for below as a direct Rust binding, a Rust-friendly simulator/context wrapper, or an explicit skip when Apple does not expose that API on macOS.

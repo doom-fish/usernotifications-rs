@@ -1,13 +1,9 @@
-use core::ffi::c_char;
-
-use serde::{Deserialize, Serialize};
-
 use crate::action::{NotificationAction, NotificationActionPayload};
+use crate::binary::decode_binary;
 use crate::content::LocalizedNotificationString;
 use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
 use crate::option_set::raw_option_set;
-use crate::private::{decode_json, to_cstring};
 
 raw_option_set!(NotificationCategoryOptions);
 
@@ -107,20 +103,21 @@ impl NotificationCategory {
 
     /// Round-trips this value through the Swift bridge.
     pub fn bridge_roundtrip(&self) -> Result<Self, UserNotificationsError> {
-        let category = encode_category_json(self)?;
-        let category = to_cstring(&category)?;
+        let category = encode_category_binary(self);
+
         let mut error = core::ptr::null_mut();
-        let payload =
-            unsafe { ffi::category::un_category_roundtrip_json(category.as_ptr(), &raw mut error) };
+        let payload = unsafe {
+            ffi::category::un_category_roundtrip_binary(category.as_ptr(), &raw mut error)
+        };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
-            decode_category_json(payload)
+            decode_category_binary(payload)
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct NotificationCategoryPayload {
     identifier: String,
     actions: Vec<NotificationActionPayload>,
@@ -169,39 +166,103 @@ impl From<NotificationCategoryPayload> for NotificationCategory {
     }
 }
 
-pub(crate) fn encode_category_json(
-    category: &NotificationCategory,
-) -> Result<String, UserNotificationsError> {
-    serde_json::to_string(&NotificationCategoryPayload::from(category)).map_err(|error| {
-        UserNotificationsError::FrameworkError(format!(
-            "failed to encode notification category: {error}",
-        ))
-    })
+pub(crate) fn encode_category_binary(category: &NotificationCategory) -> crate::binary::Input {
+    crate::binary::Input::new(&NotificationCategoryPayload::from(category))
 }
 
-pub(crate) fn decode_category_json(
-    ptr: *mut c_char,
+pub(crate) fn decode_category_binary(
+    ptr: *mut crate::ffi::abi::UNBufferRaw,
 ) -> Result<NotificationCategory, UserNotificationsError> {
-    decode_json::<NotificationCategoryPayload>(ptr).map(Into::into)
+    decode_binary::<NotificationCategoryPayload>(ptr).map(Into::into)
 }
 
-pub(crate) fn encode_categories_json(
+pub(crate) fn encode_categories_binary(
     categories: &[NotificationCategory],
-) -> Result<String, UserNotificationsError> {
+) -> crate::binary::Input {
     let payloads = categories
         .iter()
         .map(NotificationCategoryPayload::from)
         .collect::<Vec<_>>();
-    serde_json::to_string(&payloads).map_err(|error| {
-        UserNotificationsError::FrameworkError(format!(
-            "failed to encode notification categories: {error}",
-        ))
-    })
+    crate::binary::Input::new(&payloads)
 }
 
-pub(crate) fn decode_categories_json(
-    ptr: *mut c_char,
+pub(crate) fn decode_categories_binary(
+    ptr: *mut crate::ffi::abi::UNBufferRaw,
 ) -> Result<Vec<NotificationCategory>, UserNotificationsError> {
-    decode_json::<Vec<NotificationCategoryPayload>>(ptr)
+    decode_binary::<Vec<NotificationCategoryPayload>>(ptr)
         .map(|payloads| payloads.into_iter().map(Into::into).collect())
+}
+
+impl crate::binary::Record for NotificationCategoryPayload {
+    type Raw = crate::ffi::abi::UNNotificationCategoryPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            identifier: crate::binary::Record::raw(&self.identifier, arena),
+            actions: crate::binary::Record::raw(&self.actions, arena),
+            intent_identifiers: crate::binary::Record::raw(&self.intent_identifiers, arena),
+            options: self.options,
+            hidden_previews_body_placeholder: self
+                .hidden_previews_body_placeholder
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+            category_summary_format: self.category_summary_format.as_ref().map_or(
+                core::ptr::null(),
+                |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                },
+            ),
+            localized_hidden_previews_body_placeholder: self
+                .localized_hidden_previews_body_placeholder
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+            localized_category_summary_format: self
+                .localized_category_summary_format
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            identifier: unsafe { <String as crate::binary::Record>::read(&raw.identifier) }?,
+            actions: unsafe {
+                <Vec<NotificationActionPayload> as crate::binary::Record>::read(&raw.actions)
+            }?,
+            intent_identifiers: unsafe {
+                <Vec<String> as crate::binary::Record>::read(&raw.intent_identifiers)
+            }?,
+            options: raw.options,
+            hidden_previews_body_placeholder: unsafe {
+                raw.hidden_previews_body_placeholder.as_ref()
+            }
+            .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+            .transpose()?,
+            category_summary_format: unsafe { raw.category_summary_format.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+            localized_hidden_previews_body_placeholder: unsafe {
+                raw.localized_hidden_previews_body_placeholder.as_ref()
+            }
+            .map(|value| unsafe {
+                <LocalizedNotificationString as crate::binary::Record>::read(value)
+            })
+            .transpose()?,
+            localized_category_summary_format: unsafe {
+                raw.localized_category_summary_format.as_ref()
+            }
+            .map(|value| unsafe {
+                <LocalizedNotificationString as crate::binary::Record>::read(value)
+            })
+            .transpose()?,
+        })
+    }
 }

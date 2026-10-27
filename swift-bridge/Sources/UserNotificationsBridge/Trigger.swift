@@ -1,7 +1,8 @@
+import UserNotificationsABI
 import Foundation
 import UserNotifications
 
-struct UNDateComponentsPayload: Codable {
+struct UNDateComponentsPayload {
     var year: Int?
     var month: Int?
     var day: Int?
@@ -11,7 +12,7 @@ struct UNDateComponentsPayload: Codable {
     var weekday: Int?
 }
 
-struct UNNotificationTriggerPayload: Codable {
+struct UNNotificationTriggerPayload {
     var kind: String
     var repeats: Bool?
     var time_interval: Double?
@@ -146,18 +147,18 @@ func un_trigger_payload(_ trigger: UNNotificationTrigger?) -> UNNotificationTrig
     )
 }
 
-@_cdecl("un_trigger_roundtrip_json")
-public func un_trigger_roundtrip_json(
-    _ triggerJSON: UnsafePointer<CChar>?,
+@_cdecl("un_trigger_roundtrip_binary")
+public func un_trigger_roundtrip_binary(
+    _ triggerBinary: UnsafePointer<UNBufferRaw>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> UnsafeMutablePointer<CChar>? {
+) -> UnsafeMutablePointer<UNBufferRaw>? {
     do {
-        let payload = try un_decode_json(triggerJSON, as: UNNotificationTriggerPayload.self)
+        let payload = try un_decode_binary(triggerBinary, as: UNNotificationTriggerPayload.self)
         guard payload.kind != "none" else {
-            return un_string(un_encode_json(payload))
+            return un_encode_binary(payload)
         }
         let trigger = try un_make_trigger(payload)
-        return un_string(un_encode_json(un_trigger_payload(trigger)))
+        return un_encode_binary(un_trigger_payload(trigger))
     } catch {
         un_write_error(errorOut, error: error)
         return nil

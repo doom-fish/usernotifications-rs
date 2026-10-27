@@ -1,11 +1,7 @@
-use core::ffi::c_char;
-
-use serde::{Deserialize, Serialize};
-
+use crate::binary::decode_binary;
 use crate::content::{NotificationContent, NotificationContentPayload};
 use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
-use crate::private::{decode_json, to_cstring};
 use crate::trigger::{NotificationTrigger, NotificationTriggerPayload};
 
 /// Wraps `UNNotificationRequest`.
@@ -36,20 +32,20 @@ impl NotificationRequest {
 
     /// Round-trips this value through the Swift bridge.
     pub fn bridge_roundtrip(&self) -> Result<Self, UserNotificationsError> {
-        let request = encode_request_json(self)?;
-        let request = to_cstring(&request)?;
+        let request = encode_request_binary(self)?;
+
         let mut error = core::ptr::null_mut();
         let payload =
-            unsafe { ffi::request::un_request_roundtrip_json(request.as_ptr(), &raw mut error) };
+            unsafe { ffi::request::un_request_roundtrip_binary(request.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
-            decode_request_json(payload)
+            decode_request_binary(payload)
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct NotificationRequestPayload {
     identifier: String,
     content: NotificationContentPayload,
@@ -76,28 +72,53 @@ impl From<NotificationRequestPayload> for NotificationRequest {
     }
 }
 
-pub(crate) fn encode_request_json(
+pub(crate) fn encode_request_binary(
     request: &NotificationRequest,
-) -> Result<String, UserNotificationsError> {
+) -> Result<crate::binary::Input, UserNotificationsError> {
     if let Some(trigger) = &request.trigger {
         trigger.validate()?;
     }
-    serde_json::to_string(&NotificationRequestPayload::from(request)).map_err(|error| {
-        UserNotificationsError::FrameworkError(format!(
-            "failed to encode notification request: {error}",
-        ))
-    })
+    Ok(crate::binary::Input::new(
+        &NotificationRequestPayload::from(request),
+    ))
 }
 
-pub(crate) fn decode_request_json(
-    ptr: *mut c_char,
+pub(crate) fn decode_request_binary(
+    ptr: *mut crate::ffi::abi::UNBufferRaw,
 ) -> Result<NotificationRequest, UserNotificationsError> {
-    decode_json::<NotificationRequestPayload>(ptr).map(Into::into)
+    decode_binary::<NotificationRequestPayload>(ptr).map(Into::into)
 }
 
-pub(crate) fn decode_requests_json(
-    ptr: *mut c_char,
+pub(crate) fn decode_requests_binary(
+    ptr: *mut crate::ffi::abi::UNBufferRaw,
 ) -> Result<Vec<NotificationRequest>, UserNotificationsError> {
-    decode_json::<Vec<NotificationRequestPayload>>(ptr)
+    decode_binary::<Vec<NotificationRequestPayload>>(ptr)
         .map(|payloads| payloads.into_iter().map(Into::into).collect())
+}
+
+impl crate::binary::Record for NotificationRequestPayload {
+    type Raw = crate::ffi::abi::UNNotificationRequestPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            identifier: crate::binary::Record::raw(&self.identifier, arena),
+            content: crate::binary::Record::raw(&self.content, arena),
+            trigger: self.trigger.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = crate::binary::Record::raw(value, arena);
+                arena.keep(raw)
+            }),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            identifier: unsafe { <String as crate::binary::Record>::read(&raw.identifier) }?,
+            content: unsafe {
+                <NotificationContentPayload as crate::binary::Record>::read(&raw.content)
+            }?,
+            trigger: unsafe { raw.trigger.as_ref() }
+                .map(|value| unsafe {
+                    <NotificationTriggerPayload as crate::binary::Record>::read(value)
+                })
+                .transpose()?,
+        })
+    }
 }

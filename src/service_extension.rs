@@ -4,11 +4,10 @@ use std::sync::Mutex;
 
 use crate::system::strdup;
 
-use crate::content::{encode_content_json, NotificationContent};
+use crate::content::{encode_content_binary, NotificationContent};
 use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
-use crate::private::to_cstring;
-use crate::request::{encode_request_json, NotificationRequest, NotificationRequestPayload};
+use crate::request::{encode_request_binary, NotificationRequest, NotificationRequestPayload};
 
 mod private {
     pub trait Sealed {}
@@ -103,18 +102,17 @@ pub struct NotificationServiceExtensionSimulator {
 
 extern "C" fn service_receive_trampoline(
     user_info: *mut c_void,
-    request_json: *const c_char,
+    request: *const crate::ffi::abi::UNBufferRaw,
     error_out: *mut *mut c_char,
-) -> *mut c_char {
+) -> *mut crate::ffi::abi::UNBufferRaw {
     catch_unwind(AssertUnwindSafe(|| {
-        if user_info.is_null() || request_json.is_null() {
+        if user_info.is_null() || request.is_null() {
             write_error(error_out, "service extension callback received null input");
             return core::ptr::null_mut();
         }
 
         let state = unsafe { &*(user_info as *const CallbackState) };
-        let json = unsafe { std::ffi::CStr::from_ptr(request_json) }.to_string_lossy();
-        let request = match serde_json::from_str::<NotificationRequestPayload>(&json) {
+        let request = match unsafe { crate::binary::read::<NotificationRequestPayload>(request) } {
             Ok(payload) => NotificationRequest::from(payload),
             Err(error) => {
                 write_error(
@@ -130,13 +128,7 @@ extern "C" fn service_receive_trampoline(
             return core::ptr::null_mut();
         };
         let content = handler.did_receive_notification_request(request);
-        match encode_content_json(&content) {
-            Ok(json) => duplicate_string(&json),
-            Err(error) => {
-                write_error(error_out, &error.to_string());
-                core::ptr::null_mut()
-            }
-        }
+        encode_content_binary(&content).into_owned()
     }))
     .unwrap_or_else(|_| {
         write_error(error_out, "notification service handler panicked");
@@ -208,11 +200,10 @@ impl NotificationServiceExtensionSimulator {
         &self,
         request: &NotificationRequest,
     ) -> Result<NotificationContent, UserNotificationsError> {
-        let request = encode_request_json(request)?;
-        let request = to_cstring(&request)?;
+        let request = encode_request_binary(request)?;
         let mut error = core::ptr::null_mut();
         let payload = unsafe {
-            ffi::service_extension::un_service_extension_simulator_receive_request_json(
+            ffi::service_extension::un_service_extension_simulator_receive_request_binary(
                 self.raw,
                 request.as_ptr(),
                 &raw mut error,
@@ -221,7 +212,7 @@ impl NotificationServiceExtensionSimulator {
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
-            crate::content::decode_content_json(payload)
+            crate::content::decode_content_binary(payload)
         }
     }
 
@@ -240,7 +231,8 @@ impl Drop for NotificationServiceExtensionSimulator {
 }
 
 fn duplicate_string(value: &str) -> *mut c_char {
-    let c_string = std::ffi::CString::new(value).expect("encoded JSON must not contain NUL bytes");
+    let c_string =
+        std::ffi::CString::new(value.replace('\0', "\u{fffd}")).expect("NUL bytes were replaced");
     unsafe { strdup(c_string.as_ptr()) }
 }
 

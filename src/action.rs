@@ -1,12 +1,8 @@
-use core::ffi::c_char;
-
-use serde::{Deserialize, Serialize};
-
+use crate::binary::decode_binary;
 use crate::content::LocalizedNotificationString;
 use crate::error::{from_swift, UserNotificationsError};
 use crate::ffi;
 use crate::option_set::raw_option_set;
-use crate::private::{decode_json, to_cstring};
 
 raw_option_set!(NotificationActionOptions);
 
@@ -22,7 +18,7 @@ impl NotificationActionOptions {
 }
 
 /// Wraps icon metadata used by `UNNotificationActionIcon`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NotificationActionIcon {
     /// Uses a template image name for the action icon.
     TemplateImage(String),
@@ -134,19 +130,20 @@ impl NotificationAction {
 
     /// Round-trips this value through the Swift bridge.
     pub fn bridge_roundtrip(&self) -> Result<Self, UserNotificationsError> {
-        let action = encode_action_json(self)?;
-        let action = to_cstring(&action)?;
+        let action = encode_action_binary(self);
+
         let mut error = core::ptr::null_mut();
-        let payload = unsafe { ffi::action::un_action_roundtrip_json(action.as_ptr(), &raw mut error) };
+        let payload =
+            unsafe { ffi::action::un_action_roundtrip_binary(action.as_ptr(), &raw mut error) };
         if payload.is_null() {
             Err(from_swift(ffi::status::FRAMEWORK_ERROR, error))
         } else {
-            decode_action_json(payload)
+            decode_action_binary(payload)
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct NotificationActionIconPayload {
     kind: String,
     name: Option<String>,
@@ -181,7 +178,7 @@ impl From<NotificationActionIconPayload> for NotificationActionIcon {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct NotificationActionPayload {
     identifier: String,
     title: String,
@@ -226,20 +223,132 @@ impl From<NotificationActionPayload> for NotificationAction {
     }
 }
 
-pub(crate) fn encode_action_json(
-    action: &NotificationAction,
-) -> Result<String, UserNotificationsError> {
-    serde_json::to_string(&NotificationActionPayload::from(action)).map_err(|error| {
-        UserNotificationsError::FrameworkError(format!(
-            "failed to encode notification action: {error}",
-        ))
-    })
+pub(crate) fn encode_action_binary(action: &NotificationAction) -> crate::binary::Input {
+    crate::binary::Input::new(&NotificationActionPayload::from(action))
 }
 
-pub(crate) fn decode_action_json(
-    ptr: *mut c_char,
+pub(crate) fn decode_action_binary(
+    ptr: *mut crate::ffi::abi::UNBufferRaw,
 ) -> Result<NotificationAction, UserNotificationsError> {
-    decode_json::<NotificationActionPayload>(ptr).map(Into::into)
+    decode_binary::<NotificationActionPayload>(ptr).map(Into::into)
+}
+
+impl crate::binary::Record for NotificationActionIconPayload {
+    type Raw = crate::ffi::abi::UNNotificationActionIconPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            kind: match self.kind.as_str() {
+                "templateImage" => 1,
+                "systemImage" => 2,
+                _ => 0,
+            },
+            name: self.name.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = crate::binary::Record::raw(value, arena);
+                arena.keep(raw)
+            }),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            kind: match raw.kind {
+                0 => "unknown",
+                1 => "templateImage",
+                2 => "systemImage",
+                _ => return Err(crate::binary::invalid_data()),
+            }
+            .to_owned(),
+            name: unsafe { raw.name.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+        })
+    }
+}
+
+impl crate::binary::Record for NotificationActionPayload {
+    type Raw = crate::ffi::abi::UNNotificationActionPayloadRaw;
+    fn raw(&self, arena: &mut crate::binary::Arena) -> Self::Raw {
+        Self::Raw {
+            identifier: crate::binary::Record::raw(&self.identifier, arena),
+            title: crate::binary::Record::raw(&self.title, arena),
+            options: self.options,
+            icon: self.icon.as_ref().map_or(core::ptr::null(), |value| {
+                let raw = crate::binary::Record::raw(value, arena);
+                arena.keep(raw)
+            }),
+            text_input_button_title: self.text_input_button_title.as_ref().map_or(
+                core::ptr::null(),
+                |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                },
+            ),
+            text_input_placeholder: self.text_input_placeholder.as_ref().map_or(
+                core::ptr::null(),
+                |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                },
+            ),
+            localized_title: self
+                .localized_title
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+            localized_text_input_button_title: self
+                .localized_text_input_button_title
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+            localized_text_input_placeholder: self
+                .localized_text_input_placeholder
+                .as_ref()
+                .map_or(core::ptr::null(), |value| {
+                    let raw = crate::binary::Record::raw(value, arena);
+                    arena.keep(raw)
+                }),
+        }
+    }
+    unsafe fn read(raw: &Self::Raw) -> Result<Self, UserNotificationsError> {
+        Ok(Self {
+            identifier: unsafe { <String as crate::binary::Record>::read(&raw.identifier) }?,
+            title: unsafe { <String as crate::binary::Record>::read(&raw.title) }?,
+            options: raw.options,
+            icon: unsafe { raw.icon.as_ref() }
+                .map(|value| unsafe {
+                    <NotificationActionIconPayload as crate::binary::Record>::read(value)
+                })
+                .transpose()?,
+            text_input_button_title: unsafe { raw.text_input_button_title.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+            text_input_placeholder: unsafe { raw.text_input_placeholder.as_ref() }
+                .map(|value| unsafe { <String as crate::binary::Record>::read(value) })
+                .transpose()?,
+            localized_title: unsafe { raw.localized_title.as_ref() }
+                .map(|value| unsafe {
+                    <LocalizedNotificationString as crate::binary::Record>::read(value)
+                })
+                .transpose()?,
+            localized_text_input_button_title: unsafe {
+                raw.localized_text_input_button_title.as_ref()
+            }
+            .map(|value| unsafe {
+                <LocalizedNotificationString as crate::binary::Record>::read(value)
+            })
+            .transpose()?,
+            localized_text_input_placeholder: unsafe {
+                raw.localized_text_input_placeholder.as_ref()
+            }
+            .map(|value| unsafe {
+                <LocalizedNotificationString as crate::binary::Record>::read(value)
+            })
+            .transpose()?,
+        })
+    }
 }
 
 #[cfg(test)]

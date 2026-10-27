@@ -1,17 +1,18 @@
+import UserNotificationsABI
 import Dispatch
 import Foundation
 import UserNotifications
 
-struct UNCenterEventPayload: Codable {
+struct UNCenterEventPayload {
     var event: String
     var notification: UNNotificationPayload?
     var response: UNNotificationResponsePayload?
 }
 
 public typealias UNCenterEventCallback =
-    @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> Void
+    @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<UNBufferRaw>?) -> Void
 public typealias UNCenterWillPresentCallback =
-    @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> UInt64
+    @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<UNBufferRaw>?) -> UInt64
 
 private final class UNDelegateRegistration: @unchecked Sendable {
     private let eventCallback: UNCenterEventCallback?
@@ -40,14 +41,14 @@ private final class UNDelegateRegistration: @unchecked Sendable {
         release(context)
     }
 
-    func send(_ json: String) {
+    func send(_ buffer: UnsafePointer<UNBufferRaw>) {
         guard let eventCallback else { return }
-        json.withCString { eventCallback(context, $0) }
+        eventCallback(context, buffer)
     }
 
-    func willPresent(_ json: String) -> UInt64 {
+    func willPresent(_ buffer: UnsafePointer<UNBufferRaw>) -> UInt64 {
         guard let willPresentCallback else { return 0 }
-        return json.withCString { willPresentCallback(context, $0) }
+        return willPresentCallback(context, buffer)
     }
 }
 
@@ -96,8 +97,9 @@ private final class UNCenterDelegateMultiplexer: NSObject, UNUserNotificationCen
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        let json = un_encode_json(un_notification_payload(notification))
-        let bits = snapshot().reduce(UInt64(0)) { $0 | $1.willPresent(json) }
+        let buffer = un_encode_binary(un_notification_payload(notification))
+        defer { un_release_binary(buffer) }
+        let bits = snapshot().reduce(UInt64(0)) { $0 | $1.willPresent(buffer) }
         completionHandler(UNNotificationPresentationOptions(rawValue: UInt(truncatingIfNeeded: bits)))
     }
 
@@ -106,12 +108,13 @@ private final class UNCenterDelegateMultiplexer: NSObject, UNUserNotificationCen
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        let json = un_encode_json(UNCenterEventPayload(
+        let buffer = un_encode_binary(UNCenterEventPayload(
             event: "didReceiveNotificationResponse",
             notification: nil,
             response: un_response_payload(response)
         ))
-        snapshot().forEach { $0.send(json) }
+        defer { un_release_binary(buffer) }
+        snapshot().forEach { $0.send(buffer) }
         completionHandler()
     }
 
@@ -119,12 +122,13 @@ private final class UNCenterDelegateMultiplexer: NSObject, UNUserNotificationCen
         _ center: UNUserNotificationCenter,
         openSettingsFor notification: UNNotification?
     ) {
-        let json = un_encode_json(UNCenterEventPayload(
+        let buffer = un_encode_binary(UNCenterEventPayload(
             event: "openSettingsForNotification",
             notification: notification.map(un_notification_payload),
             response: nil
         ))
-        snapshot().forEach { $0.send(json) }
+        defer { un_release_binary(buffer) }
+        snapshot().forEach { $0.send(buffer) }
     }
 }
 
@@ -308,13 +312,13 @@ public func un_center_set_badge_count(
     return UNR_OK
 }
 
-@_cdecl("un_center_get_notification_settings_json")
-public func un_center_get_notification_settings_json(
+@_cdecl("un_center_get_notification_settings_binary")
+public func un_center_get_notification_settings_binary(
     _ centerPtr: UnsafeMutableRawPointer?,
-    _ outJSON: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
+    _ outBinary: UnsafeMutablePointer<UnsafeMutablePointer<UNBufferRaw>?>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
-    outJSON?.pointee = nil
+    outBinary?.pointee = nil
     guard let center = un_center_box(centerPtr)?.center else {
         un_write_error(errorOut, "notification center must not be null")
         return UNR_INVALID_ARGUMENT
@@ -322,20 +326,20 @@ public func un_center_get_notification_settings_json(
 
     let result = UNCompletionResult()
     center.getNotificationSettings {
-        result.finish(UNCompletionOutcome(payload: un_encode_json(un_settings_payload($0))))
+        result.finish(UNCompletionOutcome(payload: UNBinaryPayload(un_encode_binary(un_settings_payload($0)))))
     }
     guard let payload = result.wait()?.payload else {
         un_write_timeout(errorOut, "the notification settings")
         return UNR_TIMED_OUT
     }
-    outJSON?.pointee = un_string(payload)
+    outBinary?.pointee = payload.take()
     return UNR_OK
 }
 
 @_cdecl("un_center_set_notification_categories")
 public func un_center_set_notification_categories(
     _ centerPtr: UnsafeMutableRawPointer?,
-    _ categoriesJSON: UnsafePointer<CChar>?,
+    _ categoriesBinary: UnsafePointer<UNBufferRaw>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
     guard let center = un_center_box(centerPtr)?.center else {
@@ -344,7 +348,7 @@ public func un_center_set_notification_categories(
     }
 
     do {
-        let payloads = try un_decode_json(categoriesJSON, as: [UNNotificationCategoryPayload].self)
+        let payloads = try un_decode_binary(categoriesBinary, as: [UNNotificationCategoryPayload].self)
         center.setNotificationCategories(Set(payloads.map(un_make_category)))
         return UNR_OK
     } catch {
@@ -353,13 +357,13 @@ public func un_center_set_notification_categories(
     }
 }
 
-@_cdecl("un_center_get_notification_categories_json")
-public func un_center_get_notification_categories_json(
+@_cdecl("un_center_get_notification_categories_binary")
+public func un_center_get_notification_categories_binary(
     _ centerPtr: UnsafeMutableRawPointer?,
-    _ outJSON: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
+    _ outBinary: UnsafeMutablePointer<UnsafeMutablePointer<UNBufferRaw>?>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
-    outJSON?.pointee = nil
+    outBinary?.pointee = nil
     guard let center = un_center_box(centerPtr)?.center else {
         un_write_error(errorOut, "notification center must not be null")
         return UNR_INVALID_ARGUMENT
@@ -370,20 +374,20 @@ public func un_center_get_notification_categories_json(
         let payloads = Array($0)
             .sorted { $0.identifier < $1.identifier }
             .map { un_category_payload($0) }
-        result.finish(UNCompletionOutcome(payload: un_encode_json(payloads)))
+        result.finish(UNCompletionOutcome(payload: UNBinaryPayload(un_encode_binary(payloads))))
     }
     guard let payload = result.wait()?.payload else {
         un_write_timeout(errorOut, "the notification categories")
         return UNR_TIMED_OUT
     }
-    outJSON?.pointee = un_string(payload)
+    outBinary?.pointee = payload.take()
     return UNR_OK
 }
 
 @_cdecl("un_center_add_request")
 public func un_center_add_request(
     _ centerPtr: UnsafeMutableRawPointer?,
-    _ requestJSON: UnsafePointer<CChar>?,
+    _ requestBinary: UnsafePointer<UNBufferRaw>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
     guard let center = un_center_box(centerPtr)?.center else {
@@ -392,7 +396,7 @@ public func un_center_add_request(
     }
 
     do {
-        let payload = try un_decode_json(requestJSON, as: UNNotificationRequestPayload.self)
+        let payload = try un_decode_binary(requestBinary, as: UNNotificationRequestPayload.self)
         let request = try un_make_request(payload)
         let result = UNCompletionResult()
         center.add(request) {
@@ -413,13 +417,13 @@ public func un_center_add_request(
     }
 }
 
-@_cdecl("un_center_get_pending_requests_json")
-public func un_center_get_pending_requests_json(
+@_cdecl("un_center_get_pending_requests_binary")
+public func un_center_get_pending_requests_binary(
     _ centerPtr: UnsafeMutableRawPointer?,
-    _ outJSON: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
+    _ outBinary: UnsafeMutablePointer<UnsafeMutablePointer<UNBufferRaw>?>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
-    outJSON?.pointee = nil
+    outBinary?.pointee = nil
     guard let center = un_center_box(centerPtr)?.center else {
         un_write_error(errorOut, "notification center must not be null")
         return UNR_INVALID_ARGUMENT
@@ -430,23 +434,23 @@ public func un_center_get_pending_requests_json(
         let payloads = $0
             .sorted { $0.identifier < $1.identifier }
             .map { un_request_payload($0) }
-        result.finish(UNCompletionOutcome(payload: un_encode_json(payloads)))
+        result.finish(UNCompletionOutcome(payload: UNBinaryPayload(un_encode_binary(payloads))))
     }
     guard let payload = result.wait()?.payload else {
         un_write_timeout(errorOut, "the pending notification requests")
         return UNR_TIMED_OUT
     }
-    outJSON?.pointee = un_string(payload)
+    outBinary?.pointee = payload.take()
     return UNR_OK
 }
 
 @_cdecl("un_center_remove_pending_requests")
 public func un_center_remove_pending_requests(
     _ centerPtr: UnsafeMutableRawPointer?,
-    _ identifiersJSON: UnsafePointer<CChar>?
+    _ identifiersBinary: UnsafePointer<UNBufferRaw>?
 ) {
     guard let center = un_center_box(centerPtr)?.center,
-          let identifiers = try? un_decode_json(identifiersJSON, as: [String].self)
+          let identifiers = try? un_decode_binary(identifiersBinary, as: [String].self)
     else {
         return
     }
@@ -459,13 +463,13 @@ public func un_center_remove_all_pending_requests(_ centerPtr: UnsafeMutableRawP
     un_center_box(centerPtr)?.center.removeAllPendingNotificationRequests()
 }
 
-@_cdecl("un_center_get_delivered_notifications_json")
-public func un_center_get_delivered_notifications_json(
+@_cdecl("un_center_get_delivered_notifications_binary")
+public func un_center_get_delivered_notifications_binary(
     _ centerPtr: UnsafeMutableRawPointer?,
-    _ outJSON: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
+    _ outBinary: UnsafeMutablePointer<UnsafeMutablePointer<UNBufferRaw>?>?,
     _ errorOut: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
-    outJSON?.pointee = nil
+    outBinary?.pointee = nil
     guard let center = un_center_box(centerPtr)?.center else {
         un_write_error(errorOut, "notification center must not be null")
         return UNR_INVALID_ARGUMENT
@@ -476,23 +480,23 @@ public func un_center_get_delivered_notifications_json(
         let payloads = $0
             .sorted { $0.request.identifier < $1.request.identifier }
             .map(un_notification_payload)
-        result.finish(UNCompletionOutcome(payload: un_encode_json(payloads)))
+        result.finish(UNCompletionOutcome(payload: UNBinaryPayload(un_encode_binary(payloads))))
     }
     guard let payload = result.wait()?.payload else {
         un_write_timeout(errorOut, "the delivered notifications")
         return UNR_TIMED_OUT
     }
-    outJSON?.pointee = un_string(payload)
+    outBinary?.pointee = payload.take()
     return UNR_OK
 }
 
 @_cdecl("un_center_remove_delivered_notifications")
 public func un_center_remove_delivered_notifications(
     _ centerPtr: UnsafeMutableRawPointer?,
-    _ identifiersJSON: UnsafePointer<CChar>?
+    _ identifiersBinary: UnsafePointer<UNBufferRaw>?
 ) {
     guard let center = un_center_box(centerPtr)?.center,
-          let identifiers = try? un_decode_json(identifiersJSON, as: [String].self)
+          let identifiers = try? un_decode_binary(identifiersBinary, as: [String].self)
     else {
         return
     }

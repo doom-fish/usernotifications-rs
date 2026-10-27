@@ -1,5 +1,7 @@
+use crate::ffi::abi::UNBufferRaw;
 use std::ffi::{c_char, c_void};
 
+pub mod abi;
 pub mod action;
 pub mod attachment;
 pub mod category;
@@ -20,9 +22,9 @@ pub mod status {
 }
 
 unsafe extern "C" {
-    pub fn un_center_get_notification_settings_json(
+    pub fn un_center_get_notification_settings_binary(
         center: *mut c_void,
-        out_json: *mut *mut c_char,
+        out_binary: *mut *mut UNBufferRaw,
         error_out: *mut *mut c_char,
     ) -> i32;
 }
@@ -30,7 +32,7 @@ unsafe extern "C" {
 // Async FFI declarations
 #[cfg(feature = "async")]
 pub mod r#async {
-    use super::{c_char, c_void};
+    use super::{c_char, c_void, UNBufferRaw};
 
     pub type AsyncCallback = unsafe extern "C" fn(*const c_void, *const c_char, *mut c_void);
 
@@ -43,7 +45,7 @@ pub mod r#async {
         );
         pub fn un_center_add_notification_request_async(
             center: *mut c_void,
-            request_json: *const c_char,
+            request_binary: *const UNBufferRaw,
             cb: AsyncCallback,
             ctx: *mut c_void,
         );

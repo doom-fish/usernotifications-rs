@@ -43,15 +43,25 @@ fn invalid_time_intervals_are_errors_instead_of_objc_exceptions() {
 
 #[test]
 fn the_swift_bridge_rejects_invalid_intervals_that_bypass_rust_validation() {
-    for payload in [
-        c"{\"kind\":\"timeInterval\",\"time_interval\":0.0,\"repeats\":false}",
-        c"{\"kind\":\"timeInterval\",\"time_interval\":-1.0,\"repeats\":false}",
-        c"{\"kind\":\"timeInterval\",\"time_interval\":30.0,\"repeats\":true}",
-    ] {
+    for (time_interval, repeats) in [(0.0, 0_u8), (-1.0, 0), (30.0, 1)] {
+        let trigger = usernotifications::ffi::abi::UNNotificationTriggerPayloadRaw {
+            kind: 1,
+            repeats: &raw const repeats,
+            time_interval: &raw const time_interval,
+            date_components: core::ptr::null(),
+            next_trigger_date: core::ptr::null(),
+            class_name: core::ptr::null(),
+        };
+        let payload = usernotifications::ffi::abi::UNBufferRaw {
+            data: (&raw const trigger).cast(),
+            size: core::mem::size_of_val(&trigger),
+            owner: core::ptr::null_mut(),
+            release: None,
+        };
         let mut error = std::ptr::null_mut();
         let result = unsafe {
-            usernotifications::ffi::trigger::un_trigger_roundtrip_json(
-                payload.as_ptr(),
+            usernotifications::ffi::trigger::un_trigger_roundtrip_binary(
+                &raw const payload,
                 &raw mut error,
             )
         };

@@ -15,7 +15,13 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "UserNotificationsABI",
+            path: "Sources/UserNotificationsABI",
+            publicHeadersPath: "include"
+        ),
+        .target(
             name: "UserNotificationsBridge",
+            dependencies: ["UserNotificationsABI"],
             path: "Sources/UserNotificationsBridge",
             publicHeadersPath: "include"
         ),
