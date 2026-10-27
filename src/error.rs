@@ -1,7 +1,7 @@
 use core::ffi::c_char;
 use core::fmt;
 
-use libc::free;
+use crate::system::free;
 
 use crate::ffi;
 

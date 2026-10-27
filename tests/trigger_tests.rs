@@ -1,5 +1,9 @@
 use usernotifications::prelude::*;
 
+unsafe extern "C" {
+    fn free(ptr: *mut core::ffi::c_void);
+}
+
 #[test]
 fn time_interval_roundtrip_preserves_values() {
     let roundtrip = NotificationTrigger::time_interval(90.0, false)
@@ -10,12 +14,10 @@ fn time_interval_roundtrip_preserves_values() {
 
 #[test]
 fn calendar_roundtrip_preserves_components() {
-    let roundtrip = NotificationTrigger::calendar(
-        DateComponents::new().with_hour(8).with_minute(15),
-        true,
-    )
-    .bridge_roundtrip()
-    .expect("calendar trigger should roundtrip");
+    let roundtrip =
+        NotificationTrigger::calendar(DateComponents::new().with_hour(8).with_minute(15), true)
+            .bridge_roundtrip()
+            .expect("calendar trigger should roundtrip");
     assert!(matches!(roundtrip, NotificationTrigger::Calendar(_)));
 }
 
@@ -55,6 +57,6 @@ fn the_swift_bridge_rejects_invalid_intervals_that_bypass_rust_validation() {
         };
         assert!(result.is_null());
         assert!(!error.is_null());
-        unsafe { libc::free(error.cast()) };
+        unsafe { free(error.cast()) };
     }
 }

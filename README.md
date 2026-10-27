@@ -23,7 +23,7 @@ Safe, idiomatic Rust bindings for Apple's [UserNotifications](https://developer.
 
 ```toml
 [dependencies]
-usernotifications-rs = "0.4"
+usernotifications-rs = "0.4.4"
 ```
 
 ```rust,no_run
@@ -39,6 +39,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 ## Example catalog
+
+The crate calls system C functions through local declarations and uses `core::ffi` types.
+It does not require the `libc` crate.
 
 | Example | Area |
 | --- | --- |

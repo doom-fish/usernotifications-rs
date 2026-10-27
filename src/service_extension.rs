@@ -2,7 +2,7 @@ use core::ffi::{c_char, c_void};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Mutex;
 
-use libc::strdup;
+use crate::system::strdup;
 
 use crate::content::{encode_content_json, NotificationContent};
 use crate::error::{from_swift, UserNotificationsError};

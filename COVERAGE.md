@@ -1,5 +1,8 @@
 # UserNotifications SDK coverage
 
+Version 0.4.4 replaces the `libc` dependency with direct system C declarations.
+The framework coverage does not change.
+
 `usernotifications-rs` v0.2.1 was audited against the macOS `UserNotifications` and `UserNotificationsUI` headers in the active Xcode SDK. Every macOS-facing area is accounted for below as a direct Rust binding, a Rust-friendly simulator/context wrapper, or an explicit skip when Apple does not expose that API on macOS.
 
 Scope: the table has not been regenerated since v0.2.1. Rows are header areas, not a selector-by-selector diff, so ✅ means the area has a safe wrapper, not that every method or property is bound. The extension rows (🧪) are simulators that run the crate's own handlers; they don't produce a real app extension. The crate needs macOS 12 or newer.
